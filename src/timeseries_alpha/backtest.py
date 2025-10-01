@@ -96,7 +96,6 @@ def _turnover(
         # same as previous.
         # Avoid division by zero by handling empty rows.
         w_pretrade = (w_prev * (1.0 + realized_ret)).fillna(0.0)
-        l1 = _row_l1_norm(w_prev).replace(0, np.nan)
         tgt_l1 = _row_l1_norm(w_prev)
         # scale back to original L1 (so drifted notional totals match prior gross)
         scale = (
