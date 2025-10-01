@@ -15,7 +15,7 @@ Vectorized backtesting for cross-sectional time-series alpha signals with:
 ```bash
 # 1) Clone & enter
 git clone https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal.git
-cd Time-Series-Alpha-Signals
+cd Time-Series-Alpha-Signal
 
 # 2) (Recommended) create a virtual environment
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
