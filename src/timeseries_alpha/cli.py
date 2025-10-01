@@ -4,6 +4,7 @@ import argparse
 import os
 from datetime import date
 from typing import List
+
 import pandas as pd
 
 from timeseries_alpha.analytics import (
@@ -17,7 +18,7 @@ from timeseries_alpha.backtest import backtest
 from timeseries_alpha.data import compute_returns, load_prices
 from timeseries_alpha.metrics import avg_turnover, equity_curve, max_drawdown, sharpe
 from timeseries_alpha.plots import plot_drawdown, plot_equity_curve
-from timeseries_alpha.signals import (
+from timeseries_alpha.signals import (  
     combine_signals,
     mean_reversion_zscore,
     momentum_signal,
@@ -64,7 +65,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     ic.to_csv(os.path.join(args.out, "rank_ic.csv"), header=["ic"])
     decay.to_csv(os.path.join(args.out, "ic_decay.csv"), header=["mean_ic"])
 
-    from .plots import plot_equity_curve, plot_drawdown
+    
     plot_equity_curve(ec, os.path.join(args.out, "equity_curve.png"))
     plot_drawdown(ec, os.path.join(args.out, "drawdown.png"))
     plot_ic_histogram(ic, os.path.join(args.out, "ic_hist.png"))
@@ -113,7 +114,13 @@ def cmd_sweep(args: argparse.Namespace) -> None:
             if not sigs:
                 continue
             sig = combine_signals(sigs)
-            bt = backtest(prices, sig, cost_bps=args.cost_bps, max_gross=args.max_gross, lag_signal=1)
+            bt = backtest(
+                prices, 
+                sig, 
+                cost_bps=args.cost_bps, 
+                max_gross=args.max_gross, 
+                lag_signal=1
+            )
             s = sharpe(bt["net_returns"])
             ec = equity_curve(bt["net_returns"])
             from .metrics import max_drawdown as mdd_fn
