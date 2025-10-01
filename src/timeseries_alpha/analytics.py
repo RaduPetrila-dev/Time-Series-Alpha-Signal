@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 
 def ann_return(returns: pd.Series, periods_per_year: int = 252) -> float:
