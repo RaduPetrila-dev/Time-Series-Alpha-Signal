@@ -26,14 +26,20 @@ jobs:
           pip install -e .
           pip install pytest
 
-      - name: Smoke import (diagnose packaging issues)
+      - name: Smoke backtest (print first weights rows)
         run: |
           python - << 'PY'
-          import sys
-          print("Python:", sys.version)
-          import timeseries_alpha as m
-          print("timeseries_alpha package:", getattr(m, "__file__", "no __file__"))
+          import numpy as np, pandas as pd
+          from timeseries_alpha.backtest import backtest
+          idx = pd.date_range("2020-01-01", periods=5, freq="B")
+          price = pd.Series(np.linspace(100, 105, len(idx)), index=idx, name="A")
+          prices = pd.concat([price], axis=1)
+          sig = prices.copy()  # same as your test
+          res = backtest(prices, sig)  # default lag=1
+          print("weights head():")
+          print(res["weights"].head().to_string())
           PY
+
 
       - name: Run tests
         run: pytest -q
