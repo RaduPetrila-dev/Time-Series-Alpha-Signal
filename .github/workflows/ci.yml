@@ -1,4 +1,4 @@
-
+# .github/workflows/ci.yml
 name: CI
 
 on:
@@ -20,4 +20,3 @@ jobs:
       - run: python -m pip install -U pip
       - run: pip install -e . pytest
       - run: pytest -q
-
