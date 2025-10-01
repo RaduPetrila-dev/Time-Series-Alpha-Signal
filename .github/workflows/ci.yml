@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -21,12 +22,18 @@ jobs:
       - name: Upgrade pip
         run: python -m pip install -U pip
 
-      - name: Install package (editable) and test deps
+      - name: Install package (editable) and dev tools
         run: |
           pip install -e .
-          pip install pytest
+          pip install pytest pytest-cov ruff mypy
 
-      - name: Smoke backtest (print first weights rows)
+      - name: Lint (ruff)
+        run: ruff check src
+
+      - name: Type check (mypy)
+        run: mypy src --ignore-missing-imports
+
+      - name: Smoke import and backtest
         run: |
           python - << 'PY'
           import numpy as np, pandas as pd
@@ -34,13 +41,10 @@ jobs:
           idx = pd.date_range("2020-01-01", periods=5, freq="B")
           price = pd.Series(np.linspace(100, 105, len(idx)), index=idx, name="A")
           prices = pd.concat([price], axis=1)
-          sig = prices.copy()  # same as your test
-          res = backtest(prices, sig)  # default lag=1
-          print("weights head():")
+          res = backtest(prices, prices)
           print(res["weights"].head().to_string())
           PY
 
-
-      - name: Run tests
-        run: pytest -q
+      - name: Run tests with coverage
+        run: pytest --cov=timeseries_alpha --cov-report=term-missing -q
 
