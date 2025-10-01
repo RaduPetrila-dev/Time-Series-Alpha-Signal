@@ -6,15 +6,14 @@ import numpy as np
 import pandas as pd
 
 
-def _l1_normalize(weights: pd.DataFrame, target_gross: float) -> pd.DataFrame:
+def _l1_normalize(rows: pd.DataFrame, target_gross: float) -> pd.DataFrame:
     """
-    Normalize row-wise so that sum(|w_i|) == target_gross for each date.
-    If a row sums to 0 (or all-NaN), the result for that row stays NaN.
+    Row-wise L1 normalization so that sum(|w_i|) == target_gross for each date.
+    If a row is all-NaN or sums to 0, it stays NaN to reflect 'no signal'.
     """
-    gross = weights.abs().sum(axis=1)
-    # Replace zeros with NaN to avoid division-by-zero; preserve NaNs for warm-up rows
-    gross = gross.replace(0.0, np.nan)
-    return weights.div(gross, axis=0) * float(target_gross)
+    gross = rows.abs().sum(axis=1)
+    gross = gross.replace(0.0, np.nan)  # avoid div-by-zero; keep NaN for empty rows
+    return rows.div(gross, axis=0) * float(target_gross)
 
 
 def backtest(
@@ -25,69 +24,54 @@ def backtest(
     lag_signal: int = 1,
 ) -> Dict[str, pd.Series | pd.DataFrame]:
     """
-    Vectorized backtest with:
-      - No look-ahead (signals are lagged by `lag_signal`)
-      - L1 exposure control (Σ|w| = max_gross per day)
-      - Proportional transaction costs based on turnover
+    Vectorized backtest:
+    - No look-ahead (signals lagged by `lag_signal`)
+    - L1 exposure control (Σ|w| = max_gross per day)
+    - Proportional costs on turnover (Σ|Δw| * bps/10_000)
 
-    Parameters
-    ----------
-    prices : pd.DataFrame
-        Wide price matrix (columns = tickers, index = dates).
-    signal : pd.DataFrame
-        Raw desired signal (any scale). Will be lagged and L1-normalized.
-        NOTE: We do NOT cross-sectionally standardize by default so that
-        single-asset tests behave intuitively.
-    cost_bps : float
-        Transaction cost in basis points per unit turnover (e.g. 10 = 0.001).
-    max_gross : float
-        Daily L1 exposure target (Σ|weights|).
-    lag_signal : int
-        Number of days to lag the signal to prevent look-ahead.
-
-    Returns
-    -------
-    dict with keys:
-        - "weights"        : pd.DataFrame of portfolio weights (first `lag_signal` rows are NaN)
-        - "gross_returns"  : pd.Series of Σ(w * returns)
-        - "net_returns"    : pd.Series of gross - cost
-        - "turnover"       : pd.Series of Σ|Δw|
-        - "cost"           : pd.Series of turnover * (cost_bps / 10_000)
+    Returns dict with:
+      weights (DataFrame), gross_returns (Series), net_returns (Series),
+      turnover (Series), cost (Series)
     """
     if not isinstance(prices, pd.DataFrame) or not isinstance(signal, pd.DataFrame):
         raise TypeError("prices and signal must be pandas DataFrames")
 
-    # 1) Align on dates/tickers
+    # Align and ensure float
     prices, signal = prices.align(signal, join="inner")
     prices = prices.astype(float)
+    signal = signal.astype(float)
 
-    # 2) Compute simple returns
+    # Simple returns
     rets = prices.pct_change().fillna(0.0)
 
-    # 3) Lag signal to enforce no-lookahead
+    # --- NO LOOK-AHEAD ---
+    # Lag the raw signal FIRST
     sig_lagged = signal.shift(lag_signal)
 
-    # 4) L1-normalize to target gross exposure
-    w = _l1_normalize(sig_lagged, max_gross=max_gross)
+    # DO NOT fill NaNs here; we want warm-up rows to remain NaN in returned weights
+    # Normalize to target gross via L1 norm
+    w = _l1_normalize(sig_lagged, target_gross=max_gross)
 
-    # 5) Explicitly mark first `lag_signal` rows as NaN (so tests can detect lag)
-    if lag_signal > 0:
+    # Explicitly mark the first `lag_signal` rows as NaN so tests can detect the lag
+    # (This also covers single-asset cases where normalization could otherwise yield finite values)
+    if lag_signal > 0 and len(w) >= lag_signal:
         w.iloc[:lag_signal] = np.nan
 
-    # 6) Use zero-filled copy for return/cost/turnover math
+    # For math, use a zero-filled copy; returned weights keep NaNs on warm-up
     w_math = w.fillna(0.0)
     w_prev = w_math.shift(1).fillna(0.0)
 
-    # 7) Turnover & costs
     turnover = (w_math - w_prev).abs().sum(axis=1)
     cost = turnover * (cost_bps / 10_000.0)
 
-    # 8) Portfolio returns
     gross_returns = (w_math * rets).sum(axis=1)
     net_returns = gross_returns - cost
 
+    # Ensure dtype is float (helps some pandas versions with .dropna behavior)
+    w = w.astype(float)
+
     return {
-        "weights": w,                # first `lag_signal` rows remain NaN
+        "weights": w,                # first `lag_signal` rows are NaN by construction
         "gross_returns": gross_returns,
         "net_returns": net_returns,
         "turnover": turnover,
