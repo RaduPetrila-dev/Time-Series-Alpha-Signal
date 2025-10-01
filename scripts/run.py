@@ -9,11 +9,11 @@ from datetime import date
 
 import pandas as pd
 
-from data import load_prices, compute_returns
-from signals import momentum_signal, mean_reversion_zscore, combine_signals
-from backtest import backtest
-from metrics import sharpe, max_drawdown, equity_curve, avg_turnover
-from plots import plot_equity_curve, plot_drawdown
+from timeseries_alpha.data import load_prices, compute_returns
+from timeseries_alpha.signals import momentum_signal, mean_reversion_zscore, combine_signals
+from timeseries_alpha.backtest import backtest
+from timeseries_alpha.metrics import sharpe, max_drawdown, equity_curve, avg_turnover
+from timeseries_alpha.plots import plot_equity_curve, plot_drawdown
 
 RUN_CONFIG = {
     "tickers": ["AAPL", "MSFT", "GOOGL", "AMZN", "META"],
