@@ -1,3 +1,4 @@
+
 """
 plots.py — simple plotting helpers
 """
