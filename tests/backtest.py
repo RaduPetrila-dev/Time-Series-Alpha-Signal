@@ -11,8 +11,8 @@ def _l1_normalize(rows: pd.DataFrame, target_gross: float) -> pd.DataFrame:
     Row-wise L1 normalization so that sum(|w_i|) == target_gross for each date.
     If a row is all-NaN or sums to 0, it stays NaN to reflect 'no signal'.
     """
-    gross = rows.abs().sum(axis=1)
-    gross = gross.replace(0.0, np.nan)  # avoid div-by-zero; keep NaN for empty rows
+    gross = rows.abs().sum(axis=1)          # skipna=True by default
+    gross = gross.replace(0.0, np.nan)      # avoid div-by-zero; keep NaN for empty rows
     return rows.div(gross, axis=0) * float(target_gross)
 
 
@@ -21,13 +21,13 @@ def backtest(
     signal: pd.DataFrame,
     cost_bps: float = 10.0,
     max_gross: float = 1.0,
-    lag_signal: int = 1,
+    lag_signal: int = 1,   # <-- default MUST be 1 for your test
 ) -> Dict[str, pd.Series | pd.DataFrame]:
     """
     Vectorized backtest:
-    - No look-ahead (signals lagged by `lag_signal`)
-    - L1 exposure control (Σ|w| = max_gross per day)
-    - Proportional costs on turnover (Σ|Δw| * bps/10_000)
+      - No look-ahead (signals lagged by `lag_signal`)
+      - L1 exposure control (Σ|w| = max_gross per day)
+      - Proportional costs on turnover (Σ|Δw| * bps/10_000)
 
     Returns dict with:
       weights (DataFrame), gross_returns (Series), net_returns (Series),
@@ -45,19 +45,16 @@ def backtest(
     rets = prices.pct_change().fillna(0.0)
 
     # --- NO LOOK-AHEAD ---
-    # Lag the raw signal FIRST
     sig_lagged = signal.shift(lag_signal)
 
-    # DO NOT fill NaNs here; we want warm-up rows to remain NaN in returned weights
-    # Normalize to target gross via L1 norm
+    # Normalize to target gross via L1 norm, preserving NaNs
     w = _l1_normalize(sig_lagged, target_gross=max_gross)
 
-    # Explicitly mark the first `lag_signal` rows as NaN so tests can detect the lag
-    # (This also covers single-asset cases where normalization could otherwise yield finite values)
+    # Explicitly mark the first `lag_signal` rows as NaN so the test can detect the lag
     if lag_signal > 0 and len(w) >= lag_signal:
         w.iloc[:lag_signal] = np.nan
 
-    # For math, use a zero-filled copy; returned weights keep NaNs on warm-up
+    # Use a zero-filled copy for math only
     w_math = w.fillna(0.0)
     w_prev = w_math.shift(1).fillna(0.0)
 
@@ -67,14 +64,13 @@ def backtest(
     gross_returns = (w_math * rets).sum(axis=1)
     net_returns = gross_returns - cost
 
-    # Ensure dtype is float (helps some pandas versions with .dropna behavior)
+    # Ensure float dtype (helps DataFrame.dropna semantics)
     w = w.astype(float)
 
     return {
-        "weights": w,                # first `lag_signal` rows are NaN by construction
+        "weights": w,                # <-- NaNs preserved on warm-up rows
         "gross_returns": gross_returns,
         "net_returns": net_returns,
         "turnover": turnover,
         "cost": cost,
     }
-
