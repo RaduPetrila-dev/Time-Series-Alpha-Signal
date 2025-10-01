@@ -1,8 +1,11 @@
+
 from __future__ import annotations
+
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Optional, Tuple
+
 
 
 def _align_frames(*dfs: pd.DataFrame) -> Tuple[pd.Index, pd.Index]:
