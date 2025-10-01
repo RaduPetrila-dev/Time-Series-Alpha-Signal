@@ -33,7 +33,10 @@ def mean_reversion_zscore(returns: pd.DataFrame, lookback: int = 20) -> pd.DataF
     z = (returns - roll_mean) / (roll_std.replace(0.0, np.nan) + 1e-9)
     return (-z).fillna(0.0)
 
-def combine_signals(signals: list[pd.DataFrame], weights: list[float] | None = None) -> pd.DataFrame:
+def combine_signals(
+    signals: list[pd.DataFrame], 
+    weights: list[float] | None = None
+) -> pd.DataFrame:
     """Weighted average of multiple signals with safe alignment."""
     if not signals:
         raise ValueError("signals list is empty")
