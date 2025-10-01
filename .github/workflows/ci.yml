@@ -38,7 +38,7 @@ jobs:
           pip install pytest pytest-cov flake8
 
       - name: Lint with flake8
-        run: flake8 timeseries_alpha --count --show-source --statistics
+        run: flake8 src/timeseries_alpha --count --show-source --statistics
 
       - name: Smoke import
         run: |
