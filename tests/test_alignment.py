@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
-from src.backtest import backtest
-from src.metrics import equity_curve
+from timeseries_alpha.backtest import backtest
+from timeseries_alpha.metrics import equity_curve
 
 def test_no_lookahead():
     idx = pd.date_range("2020-01-01", periods=100, freq="B")
