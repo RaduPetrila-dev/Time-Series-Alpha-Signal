@@ -17,6 +17,21 @@ where = ["src"]
 [tool.setuptools]
 package-dir = {"" = "src"}
 
+[project.scripts]
+tsalpha = "timeseries_alpha.cli:main"
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I"]
+ignore = ["E203"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unused_configs = true
+
 
 
 
