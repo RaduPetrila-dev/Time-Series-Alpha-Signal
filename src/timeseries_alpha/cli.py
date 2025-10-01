@@ -7,11 +7,23 @@ from typing import List
 
 import pandas as pd
 
-from timeseries_alpha.data import compute_returns, load_prices
-from timeseries_alpha.signals import momentum_signal, mean_reversion_zscore, combine_signals
+from timeseries_alpha.analytics import (
+    forward_returns,
+    ic_decay,
+    plot_ic_decay,
+    plot_ic_histogram,
+    rank_ic,
+)
 from timeseries_alpha.backtest import backtest
-from timeseries_alpha.metrics import sharpe, max_drawdown, equity_curve, avg_turnover
-from timeseries_alpha.analytics import forward_returns, rank_ic, ic_decay, plot_ic_histogram, plot_ic_decay
+from timeseries_alpha.data import compute_returns, load_prices
+from timeseries_alpha.metrics import avg_turnover, equity_curve, max_drawdown, sharpe
+from timeseries_alpha.plots import plot_drawdown, plot_equity_curve
+from timeseries_alpha.signals import (
+    combine_signals,
+    mean_reversion_zscore,
+    momentum_signal,
+)
+
 
 
 def cmd_run(args: argparse.Namespace) -> None:
