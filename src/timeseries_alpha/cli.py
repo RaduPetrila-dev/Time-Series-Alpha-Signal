@@ -5,7 +5,6 @@ import os
 from datetime import date
 from typing import List
 
-import numpy as np
 import pandas as pd
 
 from timeseries_alpha.data import compute_returns, load_prices
