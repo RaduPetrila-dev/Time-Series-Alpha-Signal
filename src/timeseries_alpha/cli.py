@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 import os
-from datetime import date
+from datetime import data
 from typing import List
 
 import pandas as pd
