@@ -30,7 +30,7 @@ def _row_l1_norm(df: pd.DataFrame) -> pd.Series:
 
 def prepare_weights_from_signal(
     signal: pd.DataFrame,
-    mask tradable: Optional[pd.DataFrame] = None,
+    tradable: Optional[pd.DataFrame] = None,
     max_gross: float = 1.0,
     clip_at: Optional[float] = None,
 ) -> pd.DataFrame:
@@ -89,13 +89,18 @@ def _turnover(
     if use_drift:
         if realized_ret is None:
             raise ValueError("realized_ret required when use_drift=True")
-        # Drift prior weights by realized returns, then renormalize to keep L1 gross the same as previous.
+        # Drift prior weights by realized returns, then renormalize to keep L1 gross the 
+        # same as previous.
         # Avoid division by zero by handling empty rows.
         w_pretrade = (w_prev * (1.0 + realized_ret)).fillna(0.0)
         l1 = _row_l1_norm(w_prev).replace(0, np.nan)
         tgt_l1 = _row_l1_norm(w_prev)
         # scale back to original L1 (so drifted notional totals match prior gross)
-        scale = tgt_l1.divide(_row_l1_norm(w_pretrade)).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        scale = (
+            tgt_l1.divide(_row_l1_norm(w_pretrade))
+            .replace([np.inf, -np.inf], np.nan).
+            fillna(0.0)
+        )
         w_pretrade = w_pretrade.mul(scale, axis=0).fillna(0.0)
     else:
         w_pretrade = w_prev.fillna(0.0)
@@ -163,8 +168,14 @@ def backtest(
 
     # Turnover & costs
     w_prev = w.shift(1).fillna(0.0)
-    t_over = _turnover(w_target=w, w_prev=w_prev, use_drift=use_drift_for_turnover, realized_ret=r if use_drift_for_turnover else None)
-    # Cost in return-space (cost_per_dollar * turnover). If you prefer two-way bps per round-trip, keep as-is.
+    t_over = _turnover(
+        w_target=w,
+        w_prev=w_prev,
+        use_drift=use_drift_for_turnover,
+        realized_ret=r if use_drift_for_turnover else None,
+    )
+    # Cost in return-space (cost_per_dollar * turnover). If you prefer two-way bps 
+    # per round-trip, keep as-is.
     cost = cost_per_dollar * t_over
     net = gross - cost
 
