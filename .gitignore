@@ -1,1 +1,22 @@
+# Bytecode / cache
+__pycache__/
+*.py[cod]
+*.pyo
 
+# Environments
+.venv/
+.env
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Builds / dist
+build/
+dist/
+*.egg-info/
+
+# Project outputs
+outputs/
+data_cache/
