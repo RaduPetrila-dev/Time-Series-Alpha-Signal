@@ -1,4 +1,4 @@
-# .github/workflows/ci.yml
+
 name: CI
 
 on:
@@ -14,9 +14,28 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install -U pip
-      - run: pip install -e . pytest
-      - run: pytest -q
+
+      - name: Upgrade pip
+        run: python -m pip install -U pip
+
+      - name: Install package (editable) and test deps
+        run: |
+          pip install -e .
+          pip install pytest
+
+      - name: Smoke import (helps debug import errors)
+        run: |
+          python - << 'PY'
+          import sys
+          print("Python:", sys.version)
+          import timeseries_alpha as m
+          print("timeseries_alpha package:", m.__file__)
+          PY
+
+      - name: Run tests
+        run: pytest -q
+
