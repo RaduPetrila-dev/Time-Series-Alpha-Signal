@@ -1,25 +1,41 @@
-"""
-metrics.py — portfolio statistics
-"""
 from __future__ import annotations
-
 import numpy as np
 import pandas as pd
+from typing import Dict
 
-def sharpe(returns: pd.Series, annualization: int = 252) -> float:
-    mu = returns.mean() * annualization
-    sd = returns.std(ddof=0) * np.sqrt(annualization)
-    if sd == 0 or np.isnan(sd):
-        return float("nan")
-    return float(mu / sd)
 
-def max_drawdown(equity_curve: pd.Series) -> float:
-    roll_max = equity_curve.cummax()
-    dd = equity_curve / roll_max - 1.0
-    return float(dd.min())
+def perf_summary(net_returns: pd.Series, freq: str = "D") -> Dict[str, float]:
+    """
+    Compute simple performance stats on a net return series.
+    """
+    r = pd.Series(net_returns).dropna()
+    if r.empty:
+        return dict(n=0, ann_return=0.0, ann_vol=0.0, sharpe=0.0, max_dd=0.0)
 
-def equity_curve(returns: pd.Series, start_value: float = 1.0) -> pd.Series:
-    return (1.0 + returns.fillna(0.0)).cumprod() * start_value
+    if freq.upper().startswith("D"):
+        ann = 252
+    elif freq.upper().startswith("W"):
+        ann = 52
+    elif freq.upper().startswith("M"):
+        ann = 12
+    else:
+        ann = 252
 
-def avg_turnover(turnover: pd.Series) -> float:
-    return float(turnover.mean())
+    mean = r.mean()
+    vol = r.std(ddof=1)
+    ann_return = (1 + r).prod() ** (ann / r.shape[0]) - 1 if r.shape[0] > 0 else 0.0
+    ann_vol = vol * np.sqrt(ann)
+    sharpe = (mean * ann) / (ann_vol + 1e-12)
+
+    # Max drawdown from equity curve
+    eq = (1 + r).cumprod()
+    peak = eq.cummax()
+    dd = (eq / peak - 1.0).min()
+
+    return dict(
+        n=int(r.shape[0]),
+        ann_return=float(ann_return),
+        ann_vol=float(ann_vol),
+        sharpe=float(sharpe),
+        max_dd=float(dd),
+    )
