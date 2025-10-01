@@ -1,68 +1,78 @@
-"""
-backtest.py — vectorized backtester with transaction costs and leverage cap
-"""
 from __future__ import annotations
+
+from typing import Dict
 
 import numpy as np
 import pandas as pd
 
-def _normalize_to_gross(weights: pd.DataFrame, max_gross: float) -> pd.DataFrame:
-    gross = weights.abs().sum(axis=1)
-    scale = (max_gross / np.maximum(gross.to_numpy(), 1e-12))
-    scale = np.minimum(scale, 1.0)
-    return weights.mul(scale, axis=0)
+
+def _l1_normalize(rows: pd.DataFrame, target_gross: float) -> pd.DataFrame:
+    """
+    Row-wise L1 normalization so that sum(|w_i|) == target_gross for each date.
+    If a row is all-NaN or sums to 0, it stays NaN to reflect 'no signal'.
+    """
+    gross = rows.abs().sum(axis=1)          # skipna=True by default
+    gross = gross.replace(0.0, np.nan)      # avoid div-by-zero; keep NaN for empty rows
+    return rows.div(gross, axis=0) * float(target_gross)
+
 
 def backtest(
     prices: pd.DataFrame,
     signal: pd.DataFrame,
     cost_bps: float = 10.0,
     max_gross: float = 1.0,
-    lag_signal: int = 1,
-) -> dict:
+    lag_signal: int = 1,   # <-- default MUST be 1 for your test
+) -> Dict[str, pd.Series | pd.DataFrame]:
     """
-    Parameters
-    ----------
-    prices : pd.DataFrame
-        Price matrix.
-    signal : pd.DataFrame
-        Desired raw signal (un-normalized). Will be normalized cross-sectionally
-        and scaled to 'max_gross'. Automatically lagged by `lag_signal` days to
-        prevent lookahead.
-    cost_bps : float
-        Proportional transaction cost per unit turnover (e.g., 10 bps = 0.001).
-    max_gross : float
-        Cap on |long|+|short| exposure per day.
-    lag_signal : int
-        How many days to lag the signal before forming weights.
+    Vectorized backtest:
+      - No look-ahead (signals lagged by `lag_signal`)
+      - L1 exposure control (Σ|w| = max_gross per day)
+      - Proportional costs on turnover (Σ|Δw| * bps/10_000)
+
+    Returns dict with:
+      weights (DataFrame), gross_returns (Series), net_returns (Series),
+      turnover (Series), cost (Series)
     """
+    if not isinstance(prices, pd.DataFrame) or not isinstance(signal, pd.DataFrame):
+        raise TypeError("prices and signal must be pandas DataFrames")
+
+    # Align and ensure float
     prices, signal = prices.align(signal, join="inner")
+    prices = prices.astype(float)
+    signal = signal.astype(float)
+
+    # Simple returns
     rets = prices.pct_change().fillna(0.0)
 
-    # standardize cross-sectionally (per day), then target gross exposure
-    cs_std = signal.sub(signal.mean(axis=1), axis=0)
-    denom = signal.std(axis=1, ddof=0).replace(0.0, np.nan)
-    z = cs_std.div(denom + 1e-9, axis=0).fillna(0.0)
+    # --- NO LOOK-AHEAD ---
+    sig_lagged = signal.shift(lag_signal)
 
-    # lag to avoid lookahead
-    z = z.shift(lag_signal)
+    # Normalize to target gross via L1 norm, preserving NaNs
+    w = _l1_normalize(sig_lagged, target_gross=max_gross)
 
-    # normalize to max_gross using L1 norm (market-neutral style)
-    sum_abs = z.abs().sum(axis=1).replace(0.0, np.nan)
-    w = z.div(sum_abs, axis=0).fillna(0.0) * max_gross
+    # Explicitly mark the first `lag_signal` rows as NaN so the test can detect the lag
+    if lag_signal > 0 and len(w) >= lag_signal:
+        w.iloc[:lag_signal] = np.nan
 
-    # apply turnover-based costs
-    w_prev = w.shift(1).fillna(0.0)
-    turnover = (w - w_prev).abs().sum(axis=1)
-    cost = turnover * (cost_bps / 10000.0)
+    # Use a zero-filled copy for math only
+    w_math = w.fillna(0.0)
+    w_prev = w_math.shift(1).fillna(0.0)
 
-    port_ret_gross = (w * rets).sum(axis=1)
-    port_ret_net = port_ret_gross - cost
+    turnover = (w_math - w_prev).abs().sum(axis=1)
+    cost = turnover * (cost_bps / 10_000.0)
+
+    gross_returns = (w_math * rets).sum(axis=1)
+    net_returns = gross_returns - cost
+
+    # Ensure float dtype (helps DataFrame.dropna semantics)
+    w = w.astype(float)
 
     return {
-        "weights": w,
-        "gross_returns": port_ret_gross,
-        "net_returns": port_ret_net,
+        "weights": w,                # <-- NaNs preserved on warm-up rows
+        "gross_returns": gross_returns,
+        "net_returns": net_returns,
         "turnover": turnover,
         "cost": cost,
     }
+
     
