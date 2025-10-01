@@ -1,7 +1,9 @@
 from __future__ import annotations
-import numpy as np
-import pandas as pd
+
 from typing import Dict
+
+import pandas as pd
+import numpy as np
 
 
 def perf_summary(net_returns: pd.Series, freq: str = "D") -> Dict[str, float]:
