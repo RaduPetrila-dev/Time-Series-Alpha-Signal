@@ -1,0 +1,14 @@
+import subprocess
+import sys
+import json
+from pathlib import Path
+
+def test_cli_runs(tmp_path: Path):
+    outdir = tmp_path / "results"
+    cmd = [sys.executable, "-m", "time_series_alpha_signal", "run", "--output", str(outdir), "--days", "200"]
+    res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    metrics = json.loads(res.stdout)
+    assert "sharpe" in metrics
+    assert (outdir / "equity.png").exists()
+    assert (outdir / "drawdown.png").exists()
+    assert (outdir / "metrics.json").exists()
