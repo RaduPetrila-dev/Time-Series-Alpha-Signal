@@ -12,6 +12,7 @@ dependencies = [
   "pandas>=2.0",
   "numpy>=1.23",
   "matplotlib>=3.7"
+  , "statsmodels>=0.13"
 ]
 
 [project.scripts]
@@ -20,6 +21,5 @@ tsalpha = "time_series_alpha_signal.cli:main"
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["time_series_alpha_signal"]
-
 
 
