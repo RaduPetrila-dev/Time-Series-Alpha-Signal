@@ -14,3 +14,4 @@ __all__ = [
     "signals",
     "load_synthetic_prices",
     "load_csv_prices",
+]
