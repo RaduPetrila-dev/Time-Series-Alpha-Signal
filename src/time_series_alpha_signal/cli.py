@@ -33,6 +33,7 @@ def cmd_run(args: argparse.Namespace) -> None:
         signal_type=args.signal,
         arima_order=tuple(args.arima_order),
         max_leverage=args.max_leverage,
+        max_drawdown=args.max_drawdown,
     )
     # prepare output directory
     out_dir = Path(args.output).resolve()
@@ -85,6 +86,13 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--arima-order", dest="arima_order", nargs=3, type=int, default=[1, 0, 1], metavar=("p", "d", "q"), help="ARIMA order for arima signal")
     run.add_argument("--max-leverage", dest="max_leverage", type=float, default=None, help="Maximum gross leverage (optional)")
     run.add_argument("--csv", type=str, default=None, help="Path to CSV file containing price data")
+    run.add_argument(
+        "--max-drawdown",
+        dest="max_drawdown",
+        type=float,
+        default=None,
+        help="Optional drawdown stop (e.g. 0.2 for a 20% max drawdown); strategy goes flat after breach.",
+    )
     run.set_defaults(func=cmd_run)
     # example subcommand
     ex = sub.add_parser("example", help="Print example config")
