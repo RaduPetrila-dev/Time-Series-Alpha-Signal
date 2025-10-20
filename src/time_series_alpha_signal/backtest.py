@@ -1,8 +1,11 @@
 from __future__ import annotations
-from typing import Any, Dict
+from typing import Any, Dict, Callable, Tuple
 
 import numpy as np
 import pandas as pd
+
+from . import signals
+from . import optimizer
 
 def momentum_signal(prices: pd.DataFrame, lookback: int = 20) -> pd.DataFrame:
     """Compute a simple momentum signal based on trailing returns.
@@ -88,34 +91,65 @@ def backtest(
     max_gross: float = 1.0,
     cost_bps: float = 10.0,
     seed: int = 42,
+    signal_type: str = "momentum",
+    arima_order: Tuple[int, int, int] = (1, 0, 1),
+    max_leverage: float | None = None,
 ) -> Dict[str, Any]:
-    """Run a simple momentum backtest with no-lookahead and transaction costs.
+    """Run a time‑series cross‑sectional backtest.
+
+    This function generalises the basic momentum backtest by allowing
+    alternative signal types, optional ARIMA order specification and
+    post‑processing of weights to enforce leverage constraints.
 
     Parameters
     ----------
     prices : DataFrame
-        Asset price series.
+        Asset price series indexed by datetime.
     lookback : int, default 20
-        Lookback period for momentum signal.
+        Lookback period for simple signals (momentum, mean‑reversion and
+        volatility).
     max_gross : float, default 1.0
-        Gross exposure limit.
+        Gross exposure limit when normalising cross‑sectional ranks.  This
+        corresponds to the sum of absolute weights before leverage scaling.
     cost_bps : float, default 10.0
-        Transaction costs in basis points.
+        Proportional transaction cost in basis points (1 bps = 0.01%).
     seed : int, default 42
         Random seed (currently unused but reserved for reproducibility).
+    signal_type : {"momentum", "mean_reversion", "arima", "volatility"}, default "momentum"
+        Choice of signal function to use.  ``arima`` signals are based on
+        ARIMA forecasts and may be slow on large datasets.
+    arima_order : tuple of int, default (1, 0, 1)
+        ARIMA (p,d,q) order for the ``arima`` signal type.
+    max_leverage : float, optional
+        If provided, the post‑normalised weights are scaled to ensure that the
+        daily gross exposure does not exceed this value.  When ``None`` the
+        leverage constraint is not applied.
 
     Returns
     -------
     dict
-        A dictionary containing daily returns, cumulative equity, weights and
-        summary metrics such as CAGR, Sharpe ratio and max drawdown.
+        Contains the daily net returns (Series), cumulative equity (Series),
+        portfolio weights (DataFrame) and a dictionary of summary metrics.
     """
     # ensure chronological order
     prices = prices.sort_index()
-    # compute signal and weights
-    scores = momentum_signal(prices, lookback=lookback)
+    # compute signal
+    if signal_type == "momentum":
+        scores = signals.momentum_signal(prices, lookback=lookback)
+    elif signal_type == "mean_reversion":
+        scores = signals.mean_reversion_signal(prices, lookback=lookback)
+    elif signal_type == "arima":
+        scores = signals.arima_signal(prices, order=arima_order)
+    elif signal_type == "volatility":
+        scores = signals.volatility_signal(prices, lookback=lookback)
+    else:
+        raise ValueError(f"Unknown signal_type: {signal_type}")
+    # normalise to portfolio weights
     weights = normalize_weights(scores, max_gross=max_gross)
-    # compute daily returns (percentage change) and fill initial NaNs with zeros
+    # enforce leverage constraint if requested
+    if max_leverage is not None:
+        weights = optimizer.enforce_leverage(weights, max_leverage=max_leverage)
+    # compute daily returns and fill initial NaNs
     rets = prices.pct_change().fillna(0.0)
     # compute net returns after costs
     daily = apply_costs(rets, weights, bps=cost_bps)
@@ -137,5 +171,10 @@ def backtest(
         "lookback": int(lookback),
         "cost_bps": float(cost_bps),
         "seed": int(seed),
+        "signal_type": signal_type,
     }
+    if max_leverage is not None:
+        metrics["max_leverage"] = float(max_leverage)
+    if signal_type == "arima":
+        metrics["arima_order"] = tuple(int(x) for x in arima_order)
     return {"daily": daily, "equity": equity, "weights": weights, "metrics": metrics}
