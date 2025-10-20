@@ -94,6 +94,7 @@ def backtest(
     signal_type: str = "momentum",
     arima_order: Tuple[int, int, int] = (1, 0, 1),
     max_leverage: float | None = None,
+    max_drawdown: float | None = None,
 ) -> Dict[str, Any]:
     """Run a time‑series cross‑sectional backtest.
 
@@ -125,6 +126,12 @@ def backtest(
         daily gross exposure does not exceed this value.  When ``None`` the
         leverage constraint is not applied.
 
+    max_drawdown : float, optional
+        Drawdown stop as a positive fraction.  When the running equity curve
+        breaches ``-max_drawdown`` (e.g. ``0.15`` corresponds to −15%), all
+        subsequent returns are set to zero (the strategy goes flat).  Set
+        ``None`` to disable the drawdown stop.
+
     Returns
     -------
     dict
@@ -153,7 +160,21 @@ def backtest(
     rets = prices.pct_change().fillna(0.0)
     # compute net returns after costs
     daily = apply_costs(rets, weights, bps=cost_bps)
-    # compute cumulative equity curve
+
+    # if a drawdown stop is specified, apply a circuit breaker: when the equity
+    # curve breaches the negative drawdown threshold, subsequent daily returns
+    # are set to zero (flat exposure).  This is a simple risk control that
+    # avoids further losses once a maximum drawdown has been reached.
+    if max_drawdown is not None:
+        # compute provisional equity curve
+        equity_tmp = (1 + daily).cumprod()
+        dd = equity_tmp / equity_tmp.cummax() - 1.0
+        breach_indices = dd[dd < -abs(max_drawdown)].index
+        if len(breach_indices) > 0:
+            # identify first breach date and zero out returns thereafter
+            breach_start = breach_indices[0]
+            daily.loc[breach_start:] = 0.0
+    # recompute equity after applying drawdown stop
     equity = (1 + daily).cumprod()
     # summary metrics
     days = max(1, daily.shape[0])
@@ -175,6 +196,8 @@ def backtest(
     }
     if max_leverage is not None:
         metrics["max_leverage"] = float(max_leverage)
+    if max_drawdown is not None:
+        metrics["max_drawdown"] = float(max_drawdown)
     if signal_type == "arima":
         metrics["arima_order"] = tuple(int(x) for x in arima_order)
     return {"daily": daily, "equity": equity, "weights": weights, "metrics": metrics}
