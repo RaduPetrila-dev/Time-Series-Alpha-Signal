@@ -1,11 +1,5 @@
 #!/usr/bin/env python
 """Parameter sweep for signal backtests.
-
-This script runs the time‑series backtest across a grid of lookback windows and
-gross exposure limits (``max_gross``) and produces a heatmap of a chosen
-performance metric (e.g. Sharpe ratio).  It is intended as an educational
-example of how varying these hyperparameters affects strategy outcomes.
-
 Usage (synthetic data):
 
     python scripts/heatmap.py --signal momentum --lookbacks 10 20 40 --grosses 0.5 1.0 1.5 --output sweep
