@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-from .data import load_synthetic_prices, load_csv_prices
+from .data import load_synthetic_prices, load_csv_prices, load_yfinance_prices
 from .backtest import backtest
 
 
@@ -18,12 +18,23 @@ def cmd_run(args: argparse.Namespace) -> None:
         Parsed command-line arguments containing lookback, max_gross, cost_bps,
         number of names, number of days, random seed and output path.
     """
-    # load price data
+    # load price data based on user input: CSV, yfinance or synthetic
     if args.csv is not None:
+        # load from local CSV
         prices = load_csv_prices(args.csv)
+    elif args.tickers is not None:
+        # load from Yahoo Finance using yfinance
+        tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
+        prices = load_yfinance_prices(
+            tickers=tickers,
+            start=args.start_date,
+            end=args.end_date,
+            interval=args.interval,
+        )
     else:
+        # fallback: synthetic data
         prices = load_synthetic_prices(n_names=args.names, n_days=args.days, seed=args.seed)
-    # run backtest with chosen signal and optional leverage
+    # run backtest with chosen signal and optional leverage/drawdown
     out = backtest(
         prices=prices,
         lookback=args.lookback,
@@ -34,6 +45,11 @@ def cmd_run(args: argparse.Namespace) -> None:
         arima_order=tuple(args.arima_order),
         max_leverage=args.max_leverage,
         max_drawdown=args.max_drawdown,
+        vol_window=args.vol_window,
+        vol_threshold=args.vol_threshold,
+        ewma_span=args.ewma_span,
+        ma_short=args.ma_short,
+        ma_long=args.ma_long,
     )
     # prepare output directory
     out_dir = Path(args.output).resolve()
@@ -82,16 +98,95 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--days", type=int, default=750, help="Number of synthetic days (if CSV not supplied)")
     run.add_argument("--seed", type=int, default=42, help="Random seed for synthetic data")
     run.add_argument("--output", type=str, default="results", help="Output directory for results")
-    run.add_argument("--signal", type=str, default="momentum", choices=["momentum", "mean_reversion", "arima", "volatility"], help="Signal type to use")
+    run.add_argument(
+        "--signal",
+        type=str,
+        default="momentum",
+        choices=[
+            "momentum",
+            "mean_reversion",
+            "arima",
+            "volatility",
+            "vol_scaled_momentum",
+            "regime_switch",
+            "ewma_momentum",
+            "ma_crossover",
+        ],
+        help="Signal type to use",
+    )
     run.add_argument("--arima-order", dest="arima_order", nargs=3, type=int, default=[1, 0, 1], metavar=("p", "d", "q"), help="ARIMA order for arima signal")
     run.add_argument("--max-leverage", dest="max_leverage", type=float, default=None, help="Maximum gross leverage (optional)")
     run.add_argument("--csv", type=str, default=None, help="Path to CSV file containing price data")
+    run.add_argument(
+        "--tickers",
+        type=str,
+        default=None,
+        help="Comma-separated list of tickers to fetch from yfinance (e.g. AAPL,MSFT,GOOGL)",
+    )
+    run.add_argument(
+        "--start-date",
+        dest="start_date",
+        type=str,
+        default=None,
+        help="Start date for yfinance data in YYYY-MM-DD format",
+    )
+    run.add_argument(
+        "--end-date",
+        dest="end_date",
+        type=str,
+        default=None,
+        help="End date for yfinance data in YYYY-MM-DD format",
+    )
+    run.add_argument(
+        "--interval",
+        dest="interval",
+        type=str,
+        default="1d",
+        help="Sampling interval for yfinance data (e.g. 1d, 1wk)",
+    )
     run.add_argument(
         "--max-drawdown",
         dest="max_drawdown",
         type=float,
         default=None,
         help="Optional drawdown stop (e.g. 0.2 for a 20% max drawdown); strategy goes flat after breach.",
+    )
+    run.add_argument(
+        "--vol-window",
+        dest="vol_window",
+        type=int,
+        default=20,
+        help="Window length for volatility calculations used in vol_scaled_momentum and regime_switch",
+    )
+    run.add_argument(
+        "--vol-threshold",
+        dest="vol_threshold",
+        type=float,
+        default=0.02,
+        help="Threshold for average realised volatility used in regime_switch",
+    )
+
+    # additional parameters for advanced signals
+    run.add_argument(
+        "--ewma-span",
+        dest="ewma_span",
+        type=int,
+        default=20,
+        help="Span parameter for EWMA momentum signal",
+    )
+    run.add_argument(
+        "--ma-short",
+        dest="ma_short",
+        type=int,
+        default=10,
+        help="Short window length for moving average crossover signal",
+    )
+    run.add_argument(
+        "--ma-long",
+        dest="ma_long",
+        type=int,
+        default=50,
+        help="Long window length for moving average crossover signal",
     )
     run.set_defaults(func=cmd_run)
     # example subcommand
