@@ -2,9 +2,7 @@
 Portfolio optimisation utilities.
 
 The functions in this module apply simple post‑processing to portfolio weights
-to enforce constraints such as maximum gross leverage.  More complex
-optimisation routines (e.g. risk parity, mean–variance) could be added in
-future versions.
+to enforce constraints such as maximum gross leverage.
 
 """
 
