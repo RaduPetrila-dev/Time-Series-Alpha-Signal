@@ -87,6 +87,3 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     args.func(args)
-    parser = build_parser()
-    args = parser.parse_args()
-    args.func(args)
