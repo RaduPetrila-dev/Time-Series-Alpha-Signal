@@ -1,5 +1,5 @@
 # Time-Series Alpha Signals
-![CI](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/.github/workflows/ci.yml/badge.svg)
+![CI](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/ci.yml/badge.svg)
 
 Vectorised backtesting for cross‑sectional time‑series alpha signals.
 
