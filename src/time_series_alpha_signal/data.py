@@ -11,6 +11,7 @@ try:
 except Exception:
     yf = None  # yfinance is optional
 
+
 def load_synthetic_prices(n_names: int = 20, n_days: int = 750, seed: int = 42) -> pd.DataFrame:
     """Generate synthetic price data using a geometric random walk.
 
@@ -121,11 +122,11 @@ def load_yfinance_prices(
     data = yf.download(
         tickers, start=start, end=end, interval=interval, progress=False
     )
-    # yfinance returns a dict-like structure when multiple tickers are
+    # yfinance returns a dict‑like structure when multiple tickers are
     # downloaded.  Extract the adjusted close prices consistently.  For a
     # single ticker, ``data`` is a Series; convert to DataFrame for uniformity.
     if hasattr(data, "columns"):
-        # Multi-level columns: (attribute, ticker)
+        # Multi‑level columns: (attribute, ticker)
         if isinstance(data.columns, pd.MultiIndex):
             # select the Adj Close level
             prices = data["Adj Close"].copy()
