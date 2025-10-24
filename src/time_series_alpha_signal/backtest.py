@@ -7,6 +7,7 @@ import pandas as pd
 from . import signals
 from . import optimizer
 
+
 def momentum_signal(prices: pd.DataFrame, lookback: int = 20) -> pd.DataFrame:
     """Compute a simple momentum signal based on trailing returns.
 
@@ -29,8 +30,9 @@ def momentum_signal(prices: pd.DataFrame, lookback: int = 20) -> pd.DataFrame:
     mom = rets.rolling(lookback).sum()
     return mom.shift(1)  # strict lag, no lookahead
 
+
 def normalize_weights(scores: pd.DataFrame, max_gross: float = 1.0) -> pd.DataFrame:
-    """Convert cross-sectional scores to portfolio weights with L1 exposure control.
+    """Convert cross‑sectional scores to portfolio weights with L1 exposure control.
 
     We rank scores on each day, center them to zero mean and scale so that
     the sum of absolute weights equals ``max_gross``. This produces a long/short
@@ -39,7 +41,7 @@ def normalize_weights(scores: pd.DataFrame, max_gross: float = 1.0) -> pd.DataFr
     Parameters
     ----------
     scores : DataFrame
-        Cross-sectional signal scores.
+        Cross‑sectional signal scores.
     max_gross : float, default 1.0
         Target gross exposure (sum of absolute weights).
 
@@ -48,7 +50,7 @@ def normalize_weights(scores: pd.DataFrame, max_gross: float = 1.0) -> pd.DataFr
     DataFrame
         Daily portfolio weights per asset.
     """
-    # rank scores cross-sectionally
+    # rank scores cross‑sectionally
     ranks = scores.rank(axis=1, method="first")
     # demean ranks to ensure long/short neutrality
     centered = ranks.sub(ranks.mean(axis=1), axis=0)
@@ -56,12 +58,13 @@ def normalize_weights(scores: pd.DataFrame, max_gross: float = 1.0) -> pd.DataFr
     raw = centered.div(centered.abs().sum(axis=1), axis=0).fillna(0.0)
     return raw * max_gross
 
+
 def apply_costs(returns: pd.DataFrame, weights: pd.DataFrame, bps: float = 10.0) -> pd.Series:
     """Compute portfolio returns net of proportional transaction costs.
 
     Costs are applied based on turnover between successive days. Turnover is
     defined as the sum of absolute changes in weights across all assets. The
-    cost per day equals turnover multiplied by the basis-point cost ``bps``.
+    cost per day equals turnover multiplied by the basis‑point cost ``bps``.
 
     Parameters
     ----------
@@ -84,6 +87,7 @@ def apply_costs(returns: pd.DataFrame, weights: pd.DataFrame, bps: float = 10.0)
     cost_per_day = turnover * (bps / 1e4)
     net = gross - cost_per_day
     return net
+
 
 def backtest(
     prices: pd.DataFrame,
@@ -138,31 +142,25 @@ def backtest(
         If provided, the post‑normalised weights are scaled to ensure that the
         daily gross exposure does not exceed this value.  When ``None`` the
         leverage constraint is not applied.
-
     max_drawdown : float, optional
         Drawdown stop as a positive fraction.  When the running equity curve
         breaches ``-max_drawdown`` (e.g. ``0.15`` corresponds to −15%), all
         subsequent returns are set to zero (the strategy goes flat).  Set
         ``None`` to disable the drawdown stop.
-
     vol_window : int, default 20
         Window length for computing rolling standard deviation used by the
         ``vol_scaled_momentum`` and ``regime_switch`` signals.
-
     vol_threshold : float, default 0.02
         Threshold for average realised volatility used by ``regime_switch`` to
         decide whether to follow momentum or mean‑reversion.  If the
         universe‑wide volatility is below this value, momentum is used; if
         above, mean‑reversion is used.
-
     ewma_span : int, default 20
         Span parameter for the exponential moving average used by
         ``ewma_momentum``.  Larger values produce a slower decay and
         smoother momentum estimates.
-
     ma_short : int, default 10
         Window length for the short moving average used by ``ma_crossover``.
-
     ma_long : int, default 50
         Window length for the long moving average used by ``ma_crossover``.
 
@@ -209,7 +207,6 @@ def backtest(
     rets = prices.pct_change().fillna(0.0)
     # compute net returns after costs
     daily = apply_costs(rets, weights, bps=cost_bps)
-
     # if a drawdown stop is specified, apply a circuit breaker: when the equity
     # curve breaches the negative drawdown threshold, subsequent daily returns
     # are set to zero (flat exposure).  This is a simple risk control that
@@ -249,7 +246,6 @@ def backtest(
         metrics["max_drawdown"] = float(max_drawdown)
     if signal_type == "arima":
         metrics["arima_order"] = tuple(int(x) for x in arima_order)
-
     # record additional parameters for newer signals
     if signal_type in {"vol_scaled_momentum", "regime_switch"}:
         metrics["vol_window"] = int(vol_window)
