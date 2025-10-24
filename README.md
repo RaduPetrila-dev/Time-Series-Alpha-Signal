@@ -1,7 +1,8 @@
-Time‑Series Alpha Signals
+Time‑Series Alpha Signals (Enhanced)
 ===================================
-![CI](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/ci.yml/badge.svg)
 
+<!-- CI badge -->
+[![Real Data Backtests](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/real_data_backtests.yml/badge.svg?branch=main)](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/real_data_backtests.yml)
 
 This project implements a small research framework for building and
 evaluating cross‑sectional time‑series trading signals.  It expands on
@@ -9,14 +10,14 @@ the original momentum prototype with:
 
 - **Purged k‑fold cross‑validation** with optional embargo to avoid
   look‑ahead bias.  A combinatorial variant (CPCV) is also provided to
-  assess parameter stability【95993860354040†L629-L645】.
+  assess parameter stability.
 - **Event‑based labelling** via the *triple‑barrier* method with
-  volatility‑scaled profit‑taking, stop‑loss and vertical timeouts【238501619534694†L137-L156】.  Meta‑labels
+  volatility‑scaled profit‑taking, stop‑loss and vertical timeouts.  Meta‑labels
   indicate when a base classifier is directionally correct.
 - **Fractional differentiation** to stationarise non‑stationary price
-  series while preserving memory【678063069448557†L43-L63】.
-- **Statistical metrics** including Newey–West t‑statistics【819955570341273†L218-L246】,
-  block bootstrap confidence intervals【35980050137646†L137-L145】 and a simple deflated Sharpe ratio【908685318920237†L142-L149】.
+  series while preserving memory.
+- **Statistical metrics** including Newey–West t‑statistics,
+  block bootstrap confidence intervals and a simple deflated Sharpe ratio.
 - **Evaluation helpers** to produce a distribution of Sharpe ratios
   across cross‑validation folds and summarise performance (CAGR,
   volatility, drawdown, Calmar, hit‑rate, average win/loss, turnover).
