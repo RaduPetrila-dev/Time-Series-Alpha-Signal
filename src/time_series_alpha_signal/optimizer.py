@@ -1,17 +1,3 @@
-"""
-Portfolio optimisation utilities.
-
-This module contains simple post‑processing for portfolio weights.  In
-particular, the ``enforce_leverage`` function rescales daily weight
-vectors so that the gross leverage (sum of absolute weights) does not
-exceed a specified limit.  When the gross exposure is below the
-threshold the weights are returned unchanged; when it is above the
-threshold the weights are uniformly scaled down to satisfy the
-constraint.  Constraining leverage is a common risk control in
-quantitative trading and ensures that portfolio exposure remains
-bounded across time.
-"""
-
 from __future__ import annotations
 
 import pandas as pd
