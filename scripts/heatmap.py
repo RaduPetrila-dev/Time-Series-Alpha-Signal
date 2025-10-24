@@ -1,17 +1,3 @@
-#!/usr/bin/env python
-"""Parameter sweep for signal backtests.
-Usage (synthetic data):
-
-    python scripts/heatmap.py --signal momentum --lookbacks 10 20 40 --grosses 0.5 1.0 1.5 --output sweep
-
-Usage (custom CSV data):
-
-    python scripts/heatmap.py --csv path/to/prices.csv --signal mean_reversion --lookbacks 5 10 20 --grosses 0.5 1.0 --output my_sweep
-
-The resulting heatmap image and metrics CSV will be saved in the specified
-output directory.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -130,7 +116,7 @@ def write_csv(details: list[list[dict[str, float]]], lookbacks: Sequence[int], g
 
 def main() -> None:
     """Entry point for the heatmap script."""
-    parser = argparse.ArgumentParser(description="Run parameter sweep for time-series alpha signals")
+    parser = argparse.ArgumentParser(description="Run parameter sweep for time‑series alpha signals")
     parser.add_argument("--signal", type=str, default="momentum", choices=["momentum", "mean_reversion", "arima", "volatility"], help="Signal type")
     parser.add_argument("--lookbacks", type=int, nargs="*", default=[10, 20, 60], help="List of lookback windows to test")
     parser.add_argument("--grosses", type=float, nargs="*", default=[0.5, 1.0, 1.5], help="List of gross exposure limits to test")
