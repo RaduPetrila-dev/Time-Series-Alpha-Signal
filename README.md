@@ -1,4 +1,4 @@
-Time‑Series Alpha Signals (Enhanced)
+Time‑Series Alpha Signals
 ===================================
 ![CI](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/ci.yml/badge.svg)
 
