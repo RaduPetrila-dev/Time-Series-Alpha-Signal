@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 from typing import Any
 import argparse
 import json
 from pathlib import Path
+
 import matplotlib.pyplot as plt
 
 from .data import load_synthetic_prices, load_csv_prices, load_yfinance_prices
@@ -10,13 +12,13 @@ from .backtest import backtest
 
 
 def cmd_run(args: argparse.Namespace) -> None:
-    """Run a synthetic backtest based on command-line arguments.
+    """Run a synthetic or data‑driven backtest based on CLI args.
 
-    Parameters
-    ----------
-    args : argparse.Namespace
-        Parsed command-line arguments containing lookback, max_gross, cost_bps,
-        number of names, number of days, random seed and output path.
+    This command loads price data from a CSV, Yahoo Finance or
+    synthetic generator and runs the cross‑sectional backtest with the
+    selected signal.  Results are saved to the specified output
+    directory.  See :func:`time_series_alpha_signal.backtest.backtest`
+    for parameter definitions.
     """
     # load price data based on user input: CSV, yfinance or synthetic
     if args.csv is not None:
@@ -87,7 +89,7 @@ def cmd_print_example(args: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser for the CLI."""
-    p = argparse.ArgumentParser(prog="tsalpha", description="Time-series alpha CLI")
+    p = argparse.ArgumentParser(prog="tsalpha", description="Time‑series alpha CLI")
     sub = p.add_subparsers(dest="cmd", required=True)
     # run subcommand
     run = sub.add_parser("run", help="Run a backtest")
@@ -121,21 +123,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--tickers",
         type=str,
         default=None,
-        help="Comma-separated list of tickers to fetch from yfinance (e.g. AAPL,MSFT,GOOGL)",
+        help="Comma‑separated list of tickers to fetch from yfinance (e.g. AAPL,MSFT,GOOGL)",
     )
     run.add_argument(
         "--start-date",
         dest="start_date",
         type=str,
         default=None,
-        help="Start date for yfinance data in YYYY-MM-DD format",
+        help="Start date for yfinance data in YYYY‑MM‑DD format",
     )
     run.add_argument(
         "--end-date",
         dest="end_date",
         type=str,
         default=None,
-        help="End date for yfinance data in YYYY-MM-DD format",
+        help="End date for yfinance data in YYYY‑MM‑DD format",
     )
     run.add_argument(
         "--interval",
@@ -165,7 +167,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.02,
         help="Threshold for average realised volatility used in regime_switch",
     )
-
     # additional parameters for advanced signals
     run.add_argument(
         "--ewma-span",
@@ -196,7 +197,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
-    """Entry point for command-line execution."""
+    """Entry point for command‑line execution."""
     parser = build_parser()
     args = parser.parse_args()
     args.func(args)
