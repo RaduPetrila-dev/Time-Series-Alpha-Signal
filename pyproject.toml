@@ -21,4 +21,6 @@ tsalpha = "time_series_alpha_signal.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["time_series_alpha_signal"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
