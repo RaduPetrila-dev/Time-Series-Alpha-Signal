@@ -1,5 +1,6 @@
 Time‑Series Alpha Signals
 ===================================
+https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signals/actions/workflows/src/badge.svg
 
 This project implements a small research framework for building and
 evaluating cross‑sectional time‑series trading signals.  It expands on
