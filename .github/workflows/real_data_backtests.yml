@@ -20,12 +20,14 @@ jobs:
 
       - name: Install
         run: |
+          set -e
           python -m pip install --upgrade pip
           pip install -e .
           pip install yfinance statsmodels matplotlib
 
       - name: Run backtest
         run: |
+          set -e
           python -m time_series_alpha_signal.cli run \
             --tickers AAPL,AMZN,GOOGL,META,NFLX \
             --start-date 2018-01-01 --end-date 2023-12-31 \
@@ -34,6 +36,7 @@ jobs:
             --output results/faang_ewma_2018_2023
 
       - name: Summarise metrics
+        shell: bash
         run: |
           python - <<'PY'
           import json, pathlib
@@ -51,7 +54,7 @@ jobs:
           git config user.email "actions@github.com"
           if [ -d results ]; then
             git add results
-            git commit -m "Update FAANG backtests [skip ci]" || true
+            git commit -m "Update FAANG backtests [skip ci]" || echo "No changes"
             git push || true
           else
             echo "No results directory found; skipping commit."
