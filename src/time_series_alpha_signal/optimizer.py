@@ -1,9 +1,15 @@
 """
 Portfolio optimisation utilities.
 
-The functions in this module apply simple post‑processing to portfolio weights
-to enforce constraints such as maximum gross leverage.
-
+This module contains simple post‑processing for portfolio weights.  In
+particular, the ``enforce_leverage`` function rescales daily weight
+vectors so that the gross leverage (sum of absolute weights) does not
+exceed a specified limit.  When the gross exposure is below the
+threshold the weights are returned unchanged; when it is above the
+threshold the weights are uniformly scaled down to satisfy the
+constraint.  Constraining leverage is a common risk control in
+quantitative trading and ensures that portfolio exposure remains
+bounded across time.
 """
 
 from __future__ import annotations
@@ -31,6 +37,9 @@ def enforce_leverage(weights: pd.DataFrame, max_leverage: float = 1.0) -> pd.Dat
     DataFrame
         Scaled weights respecting the leverage constraint.
     """
+    if max_leverage <= 0:
+        raise ValueError("max_leverage must be positive")
     gross = weights.abs().sum(axis=1)
+    # scaling factor: if gross > max_leverage then scale down, else 1.0
     scale = (gross / max_leverage).clip(lower=1.0)
     return weights.div(scale, axis=0)
