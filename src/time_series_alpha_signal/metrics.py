@@ -138,6 +138,7 @@ def deflated_sharpe_ratio(returns: pd.Series, n_trials: int) -> float:
     multiple testing and non‑normality【908685318920237†L142-L149】.  This
     implementation applies a conservative adjustment proportional to
     ``sqrt(n_trials)`` to reduce the likelihood of false discoveries.
+    For a more rigorous treatment refer to López de Prado.
 
     Parameters
     ----------
