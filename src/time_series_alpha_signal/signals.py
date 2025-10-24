@@ -1,49 +1,3 @@
-"""
-Signal generation functions for time‑series alpha strategies.
-
-This module contains a collection of cross‑sectional signals that can be used to
-generate tradable rankings from price series.  All signals are lagged by one
-period to avoid look‑ahead bias.
-
-Available signals:
-
-* ``momentum_signal`` – sums trailing returns over a lookback window.
-* ``mean_reversion_signal`` – negative of trailing returns, to capture mean
-  reverting behaviour.
-* ``arima_signal`` – fits an ARIMA model to returns and uses one‑step ahead
-  forecasts as the signal (experimental; may be slow on large universes).
-* ``volatility_signal`` – negative of rolling squared returns, i.e. long low
-  volatility and short high volatility names.
-
-* ``volatility_scaled_momentum_signal`` – momentum signal scaled by inverse
-  volatility.  Positions are proportional to momentum divided by rolling
-  standard deviation, encouraging larger weights on assets with more stable
-  histories.
-
-* ``regime_switch_signal`` – switches between momentum and mean‑reversion
-  depending on the realised volatility of the universe.  When the average
-  volatility is below a threshold the signal follows momentum; when above it
-  flips to mean‑reversion.  This simple regime detection aims to perform
-  better in both trending and choppy markets.
-
-* ``ewma_momentum_signal`` – computes an exponentially weighted momentum
-  signal.  Returns are smoothed using an exponential moving average (EWMA)
-  rather than a simple sum.  This tends to react more quickly to recent
-  information while still dampening noise.  The signal is lagged by one
-  period to avoid look‑ahead bias.
-
-* ``moving_average_crossover_signal`` – computes the difference between a
-  short moving average and a long moving average.  Positive values indicate
-  assets where the short‑term trend is above the long‑term trend (bullish),
-  while negative values indicate the opposite (bearish).  This continuous
-  difference is used as a cross‑sectional score and is lagged by one period.
-
-All functions return a pandas ``DataFrame`` aligned to the input price index
-with a one‑period shift applied so that the signal at time ``t`` uses only
-information up to ``t‑1``.
-
-"""
-
 from __future__ import annotations
 
 from typing import Tuple
@@ -53,6 +7,7 @@ from statsmodels.tsa.arima.model import ARIMA  # type: ignore
 
 # A small constant to avoid division by zero in volatility scaling
 _EPS = 1e-8
+
 
 def momentum_signal(prices: pd.DataFrame, lookback: int = 20) -> pd.DataFrame:
     """Compute a simple momentum signal based on trailing returns.
