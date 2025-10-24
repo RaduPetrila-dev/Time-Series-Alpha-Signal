@@ -1,7 +1,6 @@
 Time‑Series Alpha Signals
 ===================================
-<!-- CI badge -->
-[![Real Data Backtests](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/real_data_backtests.yml/badge.svg?branch=main)](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/real_data_backtests.yml)
+![CI](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/ci.yml/badge.svg)
 
 
 This project implements a small research framework for building and
