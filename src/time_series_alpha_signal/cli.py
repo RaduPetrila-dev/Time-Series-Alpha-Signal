@@ -4,12 +4,14 @@ from typing import Any
 import argparse
 import json
 from pathlib import Path
+import sys
 
+import matplotlib
+matplotlib.use("Agg")  # headless backend for CI
 import matplotlib.pyplot as plt
 
 from .data import load_synthetic_prices, load_csv_prices, load_yfinance_prices
 from .backtest import backtest
-
 
 def cmd_run(args: argparse.Namespace) -> None:
     """Run a synthetic or data‑driven backtest based on CLI args.
@@ -33,6 +35,18 @@ def cmd_run(args: argparse.Namespace) -> None:
             end=args.end_date,
             interval=args.interval,
         )
+     elif args.tickers is not None:
+         tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
+         prices = load_yfinance_prices(
+             tickers=tickers,
+             start=args.start_date,
+             end=args.end_date,
+             interval=args.interval,
+         )
+         if prices.empty:
+             print("ERROR: No data downloaded from Yahoo Finance for the given tickers/date range.", file=sys.stderr)
+             sys.exit(2)
+
     else:
         # fallback: synthetic data
         prices = load_synthetic_prices(n_names=args.names, n_days=args.days, seed=args.seed)
@@ -201,3 +215,21 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     args.func(args)
+
+run.add_argument("--no-plots", action="store_true", help="Skip saving plots (CI-safe).")
+
+(out_dir / "metrics.json").write_text(json.dumps(out["metrics"], indent=2))
+
+if not args.no_plots:
+    fig1 = plt.figure()
+    out["equity"].plot(title="Equity Curve")
+    fig1.savefig(out_dir / "equity.png", bbox_inches="tight")
+    plt.close(fig1)
+
+    dd = (out["equity"] / out["equity"].cummax() - 1)
+    fig2 = plt.figure()
+    dd.plot(title="Drawdown")
+    fig2.savefig(out_dir / "drawdown.png", bbox_inches="tight")
+    plt.close(fig2)
+
+
