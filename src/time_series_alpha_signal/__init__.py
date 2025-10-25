@@ -23,6 +23,7 @@ from .metrics import (
 )  # noqa: F401
 from .optimizer import enforce_leverage  # noqa: F401
 from .evaluation import cross_validate_sharpe, summarize_fold_metrics  # noqa: F401
+from .optimize import optimize_ewma  # noqa: F401
 
 __all__ = [
     "backtest",
@@ -48,4 +49,5 @@ __all__ = [
     "enforce_leverage",
     "cross_validate_sharpe",
     "summarize_fold_metrics",
+    "optimize_ewma",
 ]
