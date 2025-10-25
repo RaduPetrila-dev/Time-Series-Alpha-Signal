@@ -3,9 +3,7 @@
 
 Run a grid of lookback windows and gross exposure values for a given
 signal type and visualise the resulting Sharpe ratios as a heatmap.
-Results are saved to the specified output directory.  This script is
-a lightly modified copy of the upstream heatmap utility and is
-included here for completeness.
+Results are saved to the specified output directory.  
 """
 
 from __future__ import annotations
