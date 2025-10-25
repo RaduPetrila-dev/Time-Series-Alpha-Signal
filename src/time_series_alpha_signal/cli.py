@@ -4,13 +4,12 @@ from typing import Any
 import argparse
 import json
 from pathlib import Path
-import sys
 
-import matplotlib
 import matplotlib.pyplot as plt
 
 from .data import load_synthetic_prices, load_csv_prices, load_yfinance_prices
 from .backtest import backtest
+
 
 def cmd_run(args: argparse.Namespace) -> None:
     """Run a synthetic or data‑driven backtest based on CLI args.
@@ -202,5 +201,3 @@ def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
     args.func(args)
-
-
