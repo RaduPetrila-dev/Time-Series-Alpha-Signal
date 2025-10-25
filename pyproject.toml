@@ -21,6 +21,16 @@ tsalpha = "time_series_alpha_signal.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+packages = ["time_series_alpha_signal"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+# Ruff configuration for linting
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "B"]
+
+# Mypy configuration
+[tool.mypy]
+python_version = "3.11"
+check_untyped_defs = true
+ignore_missing_imports = true
+strict_optional = false
