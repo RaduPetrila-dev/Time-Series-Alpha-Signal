@@ -91,3 +91,4 @@ def optimize_ewma(
         "results": results,
         "metrics": metrics,
     }
+
