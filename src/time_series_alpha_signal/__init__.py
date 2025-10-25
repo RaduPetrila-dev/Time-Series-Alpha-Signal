@@ -6,8 +6,15 @@ from .data import (
     load_yfinance_prices,
 )  # noqa: F401
 from .cv import PurgedKFold, combinatorial_purged_cv  # noqa: F401
-from .labels import daily_volatility, triple_barrier_labels, meta_label  # noqa: F401
-from .features import fracdiff_series, fracdiff_df  # noqa: F401
+from .labels import (
+    daily_volatility,
+    triple_barrier_labels,
+    meta_label,
+    get_vertical_barriers,
+    get_events,
+    apply_triple_barrier,
+)  # noqa: F401
+from .features import fracdiff_series, fracdiff_df, pick_min_d  # noqa: F401
 from .metrics import (
     annualised_sharpe,
     newey_west_tstat,
@@ -28,8 +35,12 @@ __all__ = [
     "daily_volatility",
     "triple_barrier_labels",
     "meta_label",
+    "get_vertical_barriers",
+    "get_events",
+    "apply_triple_barrier",
     "fracdiff_series",
     "fracdiff_df",
+    "pick_min_d",
     "annualised_sharpe",
     "newey_west_tstat",
     "block_bootstrap_ci",
