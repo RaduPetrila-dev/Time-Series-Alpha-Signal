@@ -4,8 +4,7 @@ import json
 from pathlib import Path
 
 
-def test_cli_runs(tmp_path: Path):
-    """Ensure the CLI produces expected outputs when invoked via python -m"""
+def test_cli_runs(tmp_path: Path):    
     outdir = tmp_path / "results"
     cmd = [sys.executable, "-m", "time_series_alpha_signal", "run", "--output", str(outdir), "--days", "200"]
     # run CLI
