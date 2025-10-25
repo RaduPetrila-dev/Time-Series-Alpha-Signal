@@ -1,143 +1,157 @@
 from __future__ import annotations
-import pandas as pd
+
+from typing import Iterator, List, Tuple
+
 import numpy as np
-try:
-    # yfinance is an optional dependency used for pulling real market data.  It
-    # is only imported when load_yfinance_prices is called.  This approach
-    # avoids a hard runtime dependency for users who only run synthetic or CSV
-    # based backtests.  If yfinance is not installed an ImportError will be
-    # raised when attempting to call load_yfinance_prices.
-    import yfinance as yf  # type: ignore
-except Exception:
-    yf = None  # yfinance is optional
+import pandas as pd
 
 
-def load_synthetic_prices(n_names: int = 20, n_days: int = 750, seed: int = 42) -> pd.DataFrame:
-    """Generate synthetic price data using a geometric random walk.
+class PurgedKFold:
+    """K‑fold cross‑validation with purging and an optional embargo.
 
     Parameters
     ----------
-    n_names : int, default 20
-        Number of synthetic symbols to generate.
-    n_days : int, default 750
-        Number of trading days of data to generate.
-    seed : int, default 42
-        Random seed for reproducibility.
-
-    Returns
-    -------
-    DataFrame
-        Synthetic price series indexed by business dates with symbol columns.
+    n_splits : int, default 5
+        Number of folds to create.  Must be at least 2.
+    embargo_pct : float, default 0.0
+        Fraction of the dataset to embargo after each test fold.  An
+        embargo of 0.01 corresponds to skipping 1% of the data after
+        the end of the test window for the training set.  Set to 0 to
+        disable the embargo.
     """
-    rng = np.random.default_rng(seed)
-    # generate business day index ending at today
-    dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=n_days)
-    names = [f"SYM{i:03d}" for i in range(n_names)]
-    # simulate log returns and convert to price levels
-    shocks = rng.normal(0, 0.01, size=(n_days, n_names))
-    prices = 100 * np.exp(np.cumsum(shocks, axis=0))
-    df = pd.DataFrame(prices, index=dates, columns=names).round(4)
-    return df
+
+    def __init__(self, n_splits: int = 5, embargo_pct: float = 0.0) -> None:
+        if n_splits < 2:
+            raise ValueError("n_splits must be at least 2")
+        if not (0.0 <= embargo_pct < 1.0):
+            raise ValueError("embargo_pct must be in [0, 1)")
+        self.n_splits = int(n_splits)
+        self.embargo_pct = float(embargo_pct)
+
+    def split(self, events: pd.DataFrame) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+        """Generate train/test indices with purging and embargo.
+
+        Parameters
+        ----------
+        events : DataFrame
+            Event table with at least ``t0`` and ``t1`` columns.  The
+            ordering of rows defines the chronological order of events.
+
+        Yields
+        ------
+        train_indices : ndarray of int
+            Indices of events for training, purged of overlaps with the
+            current test fold and subject to an optional embargo.
+        test_indices : ndarray of int
+            Indices of events comprising the current test fold.
+        """
+        if "t0" not in events.columns or "t1" not in events.columns:
+            raise KeyError("events must contain 't0' and 't1' columns")
+        n_events = len(events)
+        indices = np.arange(n_events)
+        # determine fold sizes for approximate equal splits
+        fold_sizes = np.full(self.n_splits, n_events // self.n_splits, dtype=int)
+        fold_sizes[: n_events % self.n_splits] += 1
+        # cumulative boundaries to slice indices
+        boundaries = np.cumsum(fold_sizes)
+        start = 0
+        for fold_size, stop in zip(fold_sizes, boundaries):
+            test_idx = indices[start:stop]
+            start = stop
+            # compute time boundaries for test
+            test_start = events.iloc[test_idx]["t0"].min()
+            test_end = events.iloc[test_idx]["t1"].max()
+            # compute embargo period length
+            if self.embargo_pct > 0:
+                span = events["t1"].max() - events["t0"].min()
+                embargo = span * self.embargo_pct
+            else:
+                embargo = pd.Timedelta(0)
+            # build train indices skipping overlapping and embargoed events
+            train_mask = np.ones(n_events, dtype=bool)
+            train_mask[test_idx] = False
+            for i in indices:
+                if not train_mask[i]:
+                    continue
+                ev_t0 = events.iloc[i]["t0"]
+                ev_t1 = events.iloc[i]["t1"]
+                # drop events overlapping test or within embargo window
+                if (ev_t0 <= test_end + embargo) and (ev_t1 >= test_start - embargo):
+                    train_mask[i] = False
+            train_idx = indices[train_mask]
+            yield train_idx, test_idx
 
 
-def load_csv_prices(path: str, date_col: str = "Date") -> pd.DataFrame:
-    """Load price data from a CSV file.
+def combinatorial_purged_cv(
+    events: pd.DataFrame,
+    n_splits: int = 5,
+    test_fold_size: int = 1,
+    embargo_pct: float = 0.0,
+) -> Iterator[Tuple[np.ndarray, np.ndarray]]:
+    """Generate combinatorial purged cross‑validation splits.
 
-    The CSV should contain a column with dates and one column per asset.  The
-    date column is parsed and used as the index.  All other columns are
-    treated as price series.  The function does not perform any resampling
-    or forward filling – users should ensure the data are properly aligned
-    and cleaned prior to backtesting.
+    This function enumerates all combinations of ``test_fold_size`` out
+    of ``n_splits`` possible folds.  For each combination, the union of
+    the selected folds constitutes the test set.  The remaining folds
+    are used for training, with purging and embargo applied as in
+    :class:`PurgedKFold`.  The number of combinations grows
+    combinatorially, so choose small values for ``n_splits`` and
+    ``test_fold_size``.
 
     Parameters
     ----------
-    path : str
-        Path to the CSV file containing price data.  The file must be
-        accessible on the local filesystem.
-    date_col : str, default "Date"
-        Name of the column containing dates.  If the file uses another
-        heading (e.g. "Datetime"), pass that column name here.
+    events : DataFrame
+        Event table with ``t0`` and ``t1`` columns.
+    n_splits : int, default 5
+        Total number of folds to divide the data into.
+    test_fold_size : int, default 1
+        Number of folds to include in the test set for each split.
+    embargo_pct : float, default 0.0
+        Fraction of the dataset to embargo after the test window.
 
-    Returns
-    -------
-    DataFrame
-        Price series indexed by dates with asset columns.
-    """
-    df = pd.read_csv(path, parse_dates=[date_col])
-    df = df.set_index(date_col)
-    # ensure numeric columns only
-    price_df = df.select_dtypes(include=[float, int]).copy()
-    price_df.index = pd.to_datetime(price_df.index)
-    return price_df
-
-
-def load_yfinance_prices(
-    tickers: list[str],
-    start: str,
-    end: str,
-    interval: str = "1d",
-    auto_dropna: bool = True,
-) -> pd.DataFrame:
-    """Fetch historical price data from Yahoo Finance for the given tickers.
-
-    This helper uses the ``yfinance`` library to download adjusted close prices
-    for a list of symbols.  The data are returned as a wide DataFrame with a
-    DatetimeIndex and one column per ticker.  Missing rows or columns can be
-    dropped by setting ``auto_dropna=True``.
-
-    Parameters
-    ----------
-    tickers : list[str]
-        List of ticker symbols to download.  Symbols should be recognised by
-        Yahoo Finance (e.g. "AAPL", "GOOGL").
-    start : str
-        Start date (inclusive) in ``YYYY-MM-DD`` format.
-    end : str
-        End date (exclusive) in ``YYYY-MM-DD`` format.
-    interval : str, default "1d"
-        Sampling interval for the price series (e.g. "1d", "1wk").  See
-        ``yfinance.download`` documentation for supported values.
-    auto_dropna : bool, default True
-        Whether to drop rows with any missing values.  For cross‑sectional
-        strategies it is generally desirable to remove dates where some
-        assets are missing to maintain alignment across the universe.
-
-    Returns
-    -------
-    DataFrame
-        Price series indexed by dates with ticker columns.
-
-    Raises
+    Yields
     ------
-    ImportError
-        If ``yfinance`` is not installed.  To install it run
-        ``pip install yfinance``.
+    train_indices : ndarray of int
+        Indices for training.
+    test_indices : ndarray of int
+        Indices for testing.
     """
-    if yf is None:
-        raise ImportError(
-            "yfinance is not installed. Please install it to load real market data "
-            "(e.g. pip install yfinance)."
-        )
-    # download adjusted close prices; progress=False suppresses verbose output
-    data = yf.download(
-        tickers, start=start, end=end, interval=interval, progress=False
-    )
-    # yfinance returns a dict‑like structure when multiple tickers are
-    # downloaded.  Extract the adjusted close prices consistently.  For a
-    # single ticker, ``data`` is a Series; convert to DataFrame for uniformity.
-    if hasattr(data, "columns"):
-        # Multi‑level columns: (attribute, ticker)
-        if isinstance(data.columns, pd.MultiIndex):
-            # select the Adj Close level
-            prices = data["Adj Close"].copy()
+    if test_fold_size < 1 or test_fold_size >= n_splits:
+        raise ValueError("test_fold_size must be between 1 and n_splits - 1")
+    # build simple k‑fold boundaries
+    n_events = len(events)
+    indices = np.arange(n_events)
+    fold_sizes = np.full(n_splits, n_events // n_splits, dtype=int)
+    fold_sizes[: n_events % n_splits] += 1
+    boundaries = np.cumsum(fold_sizes)
+    # compute fold index arrays
+    fold_indices: List[np.ndarray] = []
+    start = 0
+    for fold_size, stop in zip(fold_sizes, boundaries):
+        fold_indices.append(indices[start:stop])
+        start = stop
+    # generate combinations of test folds
+    import itertools
+
+    for combo in itertools.combinations(range(n_splits), test_fold_size):
+        test_idx = np.concatenate([fold_indices[i] for i in combo])
+        # compute time boundaries for test set
+        test_start = events.iloc[test_idx]["t0"].min()
+        test_end = events.iloc[test_idx]["t1"].max()
+        # embargo period
+        if embargo_pct > 0:
+            span = events["t1"].max() - events["t0"].min()
+            embargo = span * embargo_pct
         else:
-            prices = data.copy()
-    else:
-        # fallback: convert Series to DataFrame
-        prices = data.to_frame(name=tickers[0])
-    # ensure all data are floats
-    prices = prices.astype(float)
-    prices.index = pd.to_datetime(prices.index)
-    if auto_dropna:
-        prices = prices.dropna(how="any")
-    return prices
+            embargo = pd.Timedelta(0)
+        train_mask = np.ones(n_events, dtype=bool)
+        train_mask[test_idx] = False
+        for i in indices:
+            if not train_mask[i]:
+                continue
+            ev_t0 = events.iloc[i]["t0"]
+            ev_t1 = events.iloc[i]["t1"]
+            if (ev_t0 <= test_end + embargo) and (ev_t1 >= test_start - embargo):
+                train_mask[i] = False
+        train_idx = indices[train_mask]
+        yield train_idx, test_idx
