@@ -65,3 +65,33 @@ Directory Structure
 - **src/time_series_alpha_signal/optimizer.py** – leverage constraint helper
 - **src/time_series_alpha_signal/cli.py** – basic CLI for running single backtests
 - **scripts/run.py** – thin wrapper around the CLI for convenience
+
+CLI Extensions
+--------------
+
+The CLI now supports additional subcommands beyond ``run``:
+
+* ``cv`` – Estimate an out‑of‑sample Sharpe ratio distribution using purged
+  k‑fold (or combinatorial) cross‑validation.  The command accepts
+  the same signal parameters as ``run`` and writes a JSON report
+  containing the individual fold Sharpe ratios and their summary statistics.
+
+  ```bash
+  # example CV on synthetic data
+  python -m time_series_alpha_signal.cli cv --signal momentum \
+    --names 10 --days 500 --n-splits 5 --output cv_results
+  ```
+
+* ``train`` – Train a simple logistic regression meta‑model on each asset
+  using triple‑barrier labels.  The model predicts when the base
+  classifier is likely to be correct (meta‑labelling) and reports
+  cross‑validated classification accuracy per asset.  A JSON summary
+  is saved to the output directory.
+
+  ```bash
+  # example meta‑label training on synthetic data
+  python -m time_series_alpha_signal.cli train --names 5 --days 400 \
+    --lookback 10 --vol-span 50 --n-splits 3 --output train_results
+  ```
+
+
