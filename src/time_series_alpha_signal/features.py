@@ -82,6 +82,64 @@ def fracdiff_series(
     return pd.Series(out, index=series.index)
 
 
+def pick_min_d(
+    series: pd.Series,
+    candidates: Tuple[float, ...] = (0.2, 0.3, 0.4, 0.5, 0.6),
+    p_threshold: float = 0.05,
+) -> float:
+    """Select the smallest differencing order that yields stationarity.
+
+    This helper iterates over a set of candidate fractional orders and
+    computes the augmented Dickey–Fuller (ADF) test on the
+    fractionally differenced series.  The first candidate whose ADF
+    p‑value is below ``p_threshold`` is returned.  If no candidate
+    satisfies the criterion the largest candidate is returned.  The
+    implementation relies on ``statsmodels.tsa.stattools.adfuller``; if
+    ``statsmodels`` is not installed a ``RuntimeError`` is raised.
+
+    Parameters
+    ----------
+    series : Series
+        Input time series (e.g. price series) to analyse.
+    candidates : tuple of float, default (0.2, 0.3, 0.4, 0.5, 0.6)
+        Candidate fractional orders to test.  Values should be between
+        0 and 1.
+    p_threshold : float, default 0.05
+        P‑value threshold for rejecting the null hypothesis of a unit
+        root (i.e. the series is stationary if p < threshold).
+
+    Returns
+    -------
+    float
+        The selected fractional order.
+
+    Raises
+    ------
+    RuntimeError
+        If ``statsmodels`` is not available.
+    """
+    try:
+        from statsmodels.tsa.stattools import adfuller  # type: ignore
+    except Exception as e:
+        raise RuntimeError(
+            "statsmodels is required for pick_min_d. Please install it via 'pip install statsmodels'."
+        ) from e
+    best = None
+    for d in candidates:
+        fd = fracdiff_series(series.dropna(), d=d).dropna()
+        if len(fd) < 50:
+            continue
+        adf_stat = adfuller(fd, autolag="AIC")
+        pval = adf_stat[1]
+        if pval < p_threshold:
+            best = d
+            break
+    if best is not None:
+        return best
+    # fallback: return the largest candidate
+    return max(candidates)
+
+
 def fracdiff_df(
     df: pd.DataFrame,
     d: float,
