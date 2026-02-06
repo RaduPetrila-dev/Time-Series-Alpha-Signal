@@ -1,56 +1,321 @@
+"""Command-line interface for the Time-Series Alpha Signal framework.
+
+Subcommands
+-----------
+``run``
+    Execute a single backtest on synthetic, CSV, or Yahoo Finance data.
+``cv``
+    Estimate an out-of-sample Sharpe ratio distribution via purged
+    (or combinatorial) cross-validation.
+``train``
+    Train logistic-regression meta-models per asset using triple-barrier
+    labels and report cross-validated accuracy.
+``example``
+    Print an example configuration for the ``run`` command.
+
+All subcommands write JSON metrics and (optionally) plots to the
+specified output directory.
+
+.. note::
+   ``matplotlib`` is forced to the ``Agg`` backend at import time so
+   the CLI works in headless / CI environments.
+"""
+
 from __future__ import annotations
 
-from typing import Any
 import argparse
 import json
+import logging
+import sys
 from pathlib import Path
+from typing import Any
 
-# Always use a non‑interactive backend for matplotlib.  This prevents
-# `RuntimeError: Invalid DISPLAY variable` when running in CI or other
-# headless environments.  The backend must be set before importing
-# `matplotlib.pyplot`.
+# Force non-interactive backend before any pyplot import.
 import matplotlib  # type: ignore
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from .data import load_synthetic_prices, load_csv_prices, load_yfinance_prices
-from .backtest import backtest
+import numpy as np
+import pandas as pd
+
+from .backtest import BacktestResult, backtest
+from .data import load_csv_prices, load_synthetic_prices, load_yfinance_prices
 from .evaluation import cross_validate_sharpe
 from .models import train_meta_model
 
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Signal choices (kept in sync with the signal registry)
+# ---------------------------------------------------------------------------
+
+_SIGNAL_CHOICES = [
+    "momentum",
+    "mean_reversion",
+    "arima",
+    "volatility",
+    "vol_scaled_momentum",
+    "regime_switch",
+    "ewma_momentum",
+    "ma_crossover",
+]
+
+_REBALANCE_CHOICES = ["daily", "weekly", "monthly"]
+_IMPACT_CHOICES = ["proportional", "sqrt"]
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+
+def _load_prices_for_cli(args: argparse.Namespace) -> pd.DataFrame:
+    """Load prices from CSV, Yahoo Finance, or the synthetic generator.
+
+    The three data sources are mutually exclusive.  ``--csv`` takes
+    priority, then ``--tickers``, and finally the synthetic fallback.
+
+    Parameters
+    ----------
+    args : Namespace
+        Parsed command-line arguments.
+
+    Returns
+    -------
+    DataFrame
+        Price data indexed by datetime with one column per asset.
+    """
+    if getattr(args, "csv", None) is not None:
+        logger.info("Loading prices from CSV: %s", args.csv)
+        return load_csv_prices(args.csv)
+
+    if getattr(args, "tickers", None) is not None:
+        tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
+        logger.info("Fetching prices from yfinance: %s", tickers)
+        return load_yfinance_prices(
+            tickers=tickers,
+            start=getattr(args, "start_date", None),
+            end=getattr(args, "end_date", None),
+            interval=getattr(args, "interval", "1d"),
+        )
+
+    names = getattr(args, "names", 20)
+    days = getattr(args, "days", 750)
+    seed = getattr(args, "seed", 42)
+    logger.info(
+        "Generating synthetic prices: %d assets, %d days, seed=%d",
+        names,
+        days,
+        seed,
+    )
+    return load_synthetic_prices(n_names=names, n_days=days, seed=seed)
+
+
+def _add_dataset_args(parser: argparse.ArgumentParser) -> None:
+    """Attach the shared dataset arguments to *parser*.
+
+    Centralises ``--csv``, ``--tickers``, ``--start-date``,
+    ``--end-date``, and ``--interval`` so every subcommand gets
+    them without duplication.
+    """
+    group = parser.add_argument_group("data source")
+    group.add_argument(
+        "--csv",
+        type=str,
+        default=None,
+        help="Path to a CSV file with price data (datetime index, asset columns).",
+    )
+    group.add_argument(
+        "--tickers",
+        type=str,
+        default=None,
+        help="Comma-separated tickers for yfinance (e.g. AAPL,MSFT,GOOGL).",
+    )
+    group.add_argument(
+        "--start-date",
+        dest="start_date",
+        type=str,
+        default=None,
+        help="Start date for yfinance data (YYYY-MM-DD).",
+    )
+    group.add_argument(
+        "--end-date",
+        dest="end_date",
+        type=str,
+        default=None,
+        help="End date for yfinance data (YYYY-MM-DD).",
+    )
+    group.add_argument(
+        "--interval",
+        type=str,
+        default="1d",
+        help="Sampling interval for yfinance data (default: 1d).",
+    )
+
+
+def _add_signal_args(parser: argparse.ArgumentParser) -> None:
+    """Attach signal-related arguments to *parser*."""
+    group = parser.add_argument_group("signal parameters")
+    group.add_argument(
+        "--signal",
+        type=str,
+        default="momentum",
+        choices=_SIGNAL_CHOICES,
+        help="Signal type (default: momentum).",
+    )
+    group.add_argument(
+        "--lookback",
+        type=int,
+        default=20,
+        help="Lookback window for simple signals (default: 20).",
+    )
+    group.add_argument(
+        "--arima-order",
+        dest="arima_order",
+        nargs=3,
+        type=int,
+        default=[1, 0, 1],
+        metavar=("P", "D", "Q"),
+        help="ARIMA order for the arima signal (default: 1 0 1).",
+    )
+    group.add_argument(
+        "--vol-window",
+        dest="vol_window",
+        type=int,
+        default=20,
+        help="Rolling volatility window for vol-based signals (default: 20).",
+    )
+    group.add_argument(
+        "--vol-threshold",
+        dest="vol_threshold",
+        type=float,
+        default=0.02,
+        help="Volatility threshold for regime_switch (default: 0.02).",
+    )
+    group.add_argument(
+        "--ewma-span",
+        dest="ewma_span",
+        type=int,
+        default=20,
+        help="EWMA span for ewma_momentum (default: 20).",
+    )
+    group.add_argument(
+        "--ma-short",
+        dest="ma_short",
+        type=int,
+        default=10,
+        help="Short MA window for ma_crossover (default: 10).",
+    )
+    group.add_argument(
+        "--ma-long",
+        dest="ma_long",
+        type=int,
+        default=50,
+        help="Long MA window for ma_crossover (default: 50).",
+    )
+
+
+def _save_plots(result: BacktestResult, out_dir: Path) -> None:
+    """Write equity curve and drawdown plots to *out_dir*.
+
+    Parameters
+    ----------
+    result : BacktestResult
+        Completed backtest output.
+    out_dir : Path
+        Directory to write PNG files into.
+    """
+    # Equity curve
+    fig, ax = plt.subplots(figsize=(10, 5))
+    result.equity.plot(ax=ax, title="Equity Curve")
+    ax.set_ylabel("Cumulative Return")
+    ax.set_xlabel("")
+    fig.savefig(out_dir / "equity.png", bbox_inches="tight", dpi=150)
+    plt.close(fig)
+
+    # Drawdown
+    dd = result.equity / result.equity.cummax() - 1
+    fig, ax = plt.subplots(figsize=(10, 4))
+    dd.plot(ax=ax, title="Drawdown", color="crimson")
+    ax.set_ylabel("Drawdown")
+    ax.set_xlabel("")
+    ax.fill_between(dd.index, dd.values, alpha=0.3, color="crimson")
+    fig.savefig(out_dir / "drawdown.png", bbox_inches="tight", dpi=150)
+    plt.close(fig)
+
+    # Rolling Sharpe (63-day, ~1 quarter)
+    rolling_sharpe = (
+        result.daily.rolling(63).mean()
+        / result.daily.rolling(63).std()
+        * np.sqrt(252)
+    )
+    fig, ax = plt.subplots(figsize=(10, 4))
+    rolling_sharpe.plot(ax=ax, title="Rolling 63-day Sharpe Ratio")
+    ax.axhline(0, color="grey", linewidth=0.8, linestyle="--")
+    ax.set_ylabel("Sharpe Ratio")
+    ax.set_xlabel("")
+    fig.savefig(out_dir / "rolling_sharpe.png", bbox_inches="tight", dpi=150)
+    plt.close(fig)
+
+    # Monthly returns heatmap
+    try:
+        monthly = result.daily.copy()
+        monthly.index = pd.to_datetime(monthly.index)
+        monthly_ret = monthly.resample("ME").apply(lambda x: (1 + x).prod() - 1)
+        pivot = pd.DataFrame(
+            {
+                "year": monthly_ret.index.year,
+                "month": monthly_ret.index.month,
+                "return": monthly_ret.values,
+            }
+        )
+        heatmap_data = pivot.pivot(index="year", columns="month", values="return")
+        heatmap_data.columns = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        ][: len(heatmap_data.columns)]
+
+        fig, ax = plt.subplots(figsize=(12, max(3, len(heatmap_data) * 0.6)))
+        im = ax.imshow(
+            heatmap_data.values,
+            cmap="RdYlGn",
+            aspect="auto",
+            vmin=-0.10,
+            vmax=0.10,
+        )
+        ax.set_xticks(range(len(heatmap_data.columns)))
+        ax.set_xticklabels(heatmap_data.columns)
+        ax.set_yticks(range(len(heatmap_data.index)))
+        ax.set_yticklabels(heatmap_data.index)
+        ax.set_title("Monthly Returns Heatmap")
+        fig.colorbar(im, ax=ax, label="Return")
+        fig.savefig(out_dir / "monthly_heatmap.png", bbox_inches="tight", dpi=150)
+        plt.close(fig)
+    except Exception:
+        logger.debug("Skipping monthly heatmap (insufficient data).", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
+# Subcommand handlers
+# ---------------------------------------------------------------------------
+
 
 def cmd_run(args: argparse.Namespace) -> None:
-    """Run a synthetic or data‑driven backtest based on CLI args.
+    """Run a single backtest and save results.
 
-    This command loads price data from a CSV, Yahoo Finance or
-    synthetic generator and runs the cross‑sectional backtest with the
-    selected signal.  Results are saved to the specified output
-    directory.  See :func:`time_series_alpha_signal.backtest.backtest`
-    for parameter definitions.
+    Loads prices from CSV, Yahoo Finance, or the synthetic generator,
+    executes the backtest with the selected signal and parameters, then
+    writes metrics JSON and (optionally) diagnostic plots to the output
+    directory.
     """
-    # load price data based on user input: CSV, yfinance or synthetic
-    if args.csv is not None:
-        # load from local CSV
-        prices = load_csv_prices(args.csv)
-    elif args.tickers is not None:
-        # load from Yahoo Finance using yfinance
-        tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
-        prices = load_yfinance_prices(
-            tickers=tickers,
-            start=args.start_date,
-            end=args.end_date,
-            interval=args.interval,
-        )
-    else:
-        # fallback: synthetic data
-        prices = load_synthetic_prices(n_names=args.names, n_days=args.days, seed=args.seed)
-    # run backtest with chosen signal and optional leverage/drawdown
-    out = backtest(
+    prices = _load_prices_for_cli(args)
+
+    result: BacktestResult = backtest(
         prices=prices,
         lookback=args.lookback,
         max_gross=args.max_gross,
         cost_bps=args.cost_bps,
-        seed=args.seed,
         signal_type=args.signal,
         arima_order=tuple(args.arima_order),
         max_leverage=args.max_leverage,
@@ -60,255 +325,42 @@ def cmd_run(args: argparse.Namespace) -> None:
         ewma_span=args.ewma_span,
         ma_short=args.ma_short,
         ma_long=args.ma_long,
+        rebalance=args.rebalance,
+        impact_model=args.impact_model,
     )
-    # prepare output directory
+
     out_dir = Path(args.output).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
-    # save metrics as JSON
-    (out_dir / "metrics.json").write_text(json.dumps(out["metrics"], indent=2))
-    # create plots unless suppressed
+
+    # Write metrics
+    (out_dir / "metrics.json").write_text(
+        json.dumps(result.metrics, indent=2)
+    )
+
+    # Write daily returns and weights for reproducibility
+    result.daily.to_csv(out_dir / "daily_returns.csv", header=True)
+    result.weights.to_csv(out_dir / "weights.csv")
+
+    # Plots
     if not getattr(args, "no_plots", False):
-        # plot equity curve
-        fig1 = plt.figure()
-        out["equity"].plot(title="Equity Curve")
-        fig1.savefig(out_dir / "equity.png", bbox_inches="tight")
-        plt.close(fig1)
-        # plot drawdown
-        dd = (out["equity"] / out["equity"].cummax() - 1)
-        fig2 = plt.figure()
-        dd.plot(title="Drawdown")
-        fig2.savefig(out_dir / "drawdown.png", bbox_inches="tight")
-        plt.close(fig2)
-    # print metrics to stdout for CLI consumption
-    print(json.dumps(out["metrics"], indent=2))
+        _save_plots(result, out_dir)
 
+    if result.stopped:
+        logger.warning("Drawdown stop was triggered during this backtest.")
 
-def cmd_print_example(args: argparse.Namespace) -> None:
-    """Print an example configuration for the run command."""
-    example = {
-        "lookback": 20,
-        "max_gross": 1.0,
-        "cost_bps": 10.0,
-        "names": 20,
-        "days": 750,
-        "seed": 42,
-        "output": "results",
-    }
-    print(json.dumps(example, indent=2))
-
-
-def build_parser() -> argparse.ArgumentParser:
-    """Build the argument parser for the CLI."""
-    p = argparse.ArgumentParser(prog="tsalpha", description="Time‑series alpha CLI")
-    sub = p.add_subparsers(dest="cmd", required=True)
-    # run subcommand
-    run = sub.add_parser("run", help="Run a backtest")
-    run.add_argument("--lookback", type=int, default=20, help="Lookback window for simple signals")
-    run.add_argument("--max-gross", dest="max_gross", type=float, default=1.0, help="Gross exposure limit")
-    run.add_argument("--cost-bps", dest="cost_bps", type=float, default=10.0, help="Transaction cost in bps")
-    run.add_argument("--names", type=int, default=20, help="Number of synthetic symbols (if CSV not supplied)")
-    run.add_argument("--days", type=int, default=750, help="Number of synthetic days (if CSV not supplied)")
-    run.add_argument("--seed", type=int, default=42, help="Random seed for synthetic data")
-    run.add_argument("--output", type=str, default="results", help="Output directory for results")
-    run.add_argument(
-        "--signal",
-        type=str,
-        default="momentum",
-        choices=[
-            "momentum",
-            "mean_reversion",
-            "arima",
-            "volatility",
-            "vol_scaled_momentum",
-            "regime_switch",
-            "ewma_momentum",
-            "ma_crossover",
-        ],
-        help="Signal type to use",
-    )
-    run.add_argument("--arima-order", dest="arima_order", nargs=3, type=int, default=[1, 0, 1], metavar=("p", "d", "q"), help="ARIMA order for arima signal")
-    run.add_argument("--max-leverage", dest="max_leverage", type=float, default=None, help="Maximum gross leverage (optional)")
-    run.add_argument("--csv", type=str, default=None, help="Path to CSV file containing price data")
-    run.add_argument(
-        "--tickers",
-        type=str,
-        default=None,
-        help="Comma‑separated list of tickers to fetch from yfinance (e.g. AAPL,MSFT,GOOGL)",
-    )
-    run.add_argument(
-        "--start-date",
-        dest="start_date",
-        type=str,
-        default=None,
-        help="Start date for yfinance data in YYYY‑MM‑DD format",
-    )
-    run.add_argument(
-        "--end-date",
-        dest="end_date",
-        type=str,
-        default=None,
-        help="End date for yfinance data in YYYY‑MM‑DD format",
-    )
-    run.add_argument(
-        "--interval",
-        dest="interval",
-        type=str,
-        default="1d",
-        help="Sampling interval for yfinance data (e.g. 1d, 1wk)",
-    )
-    run.add_argument(
-        "--max-drawdown",
-        dest="max_drawdown",
-        type=float,
-        default=None,
-        help="Optional drawdown stop (e.g. 0.2 for a 20% max drawdown); strategy goes flat after breach.",
-    )
-    run.add_argument(
-        "--vol-window",
-        dest="vol_window",
-        type=int,
-        default=20,
-        help="Window length for volatility calculations used in vol_scaled_momentum and regime_switch",
-    )
-    run.add_argument(
-        "--vol-threshold",
-        dest="vol_threshold",
-        type=float,
-        default=0.02,
-        help="Threshold for average realised volatility used in regime_switch",
-    )
-    # additional parameters for advanced signals
-    run.add_argument(
-        "--ewma-span",
-        dest="ewma_span",
-        type=int,
-        default=20,
-        help="Span parameter for EWMA momentum signal",
-    )
-    run.add_argument(
-        "--ma-short",
-        dest="ma_short",
-        type=int,
-        default=10,
-        help="Short window length for moving average crossover signal",
-    )
-    run.add_argument(
-        "--ma-long",
-        dest="ma_long",
-        type=int,
-        default=50,
-        help="Long window length for moving average crossover signal",
-    )
-    run.add_argument(
-        "--no-plots",
-        action="store_true",
-        help="Do not save equity and drawdown plots (useful for CI)",
-    )
-    run.set_defaults(func=cmd_run)
-    # example subcommand
-    ex = sub.add_parser("example", help="Print example config")
-    ex.set_defaults(func=cmd_print_example)
-
-    # cross‑validation subcommand
-    cv = sub.add_parser("cv", help="Estimate out‑of‑sample Sharpe via purged CV")
-    cv.add_argument("--lookback", type=int, default=20, help="Lookback window for simple signals")
-    cv.add_argument("--max-gross", dest="max_gross", type=float, default=1.0, help="Gross exposure limit")
-    cv.add_argument("--cost-bps", dest="cost_bps", type=float, default=10.0, help="Transaction cost in bps")
-    cv.add_argument("--signal", type=str, default="momentum", choices=[
-        "momentum", "mean_reversion", "arima", "volatility", "vol_scaled_momentum",
-        "regime_switch", "ewma_momentum", "ma_crossover",
-    ], help="Signal type to use")
-    cv.add_argument("--n-splits", dest="n_splits", type=int, default=5, help="Number of folds for CV")
-    cv.add_argument("--embargo-pct", dest="embargo_pct", type=float, default=0.0, help="Embargo percentage between folds")
-    cv.add_argument("--combinatorial", action="store_true", help="Use combinatorial purged CV")
-    cv.add_argument("--test-fold-size", dest="test_fold_size", type=int, default=1, help="Test fold size for combinatorial CV")
-    cv.add_argument("--output", type=str, default="results_cv", help="Output directory for CV results")
-    # dataset options for cv
-    cv.add_argument("--csv", type=str, default=None, help="Path to CSV file containing price data")
-    cv.add_argument("--tickers", type=str, default=None, help="Comma‑separated list of tickers to fetch from yfinance")
-    cv.add_argument("--start-date", dest="start_date", type=str, default=None, help="Start date for yfinance data in YYYY‑MM‑DD format")
-    cv.add_argument("--end-date", dest="end_date", type=str, default=None, help="End date for yfinance data in YYYY‑MM‑DD format")
-    cv.add_argument("--interval", dest="interval", type=str, default="1d", help="Sampling interval for yfinance data")
-    # signal specific kwargs
-    cv.add_argument("--vol-window", dest="vol_window", type=int, default=20, help="Volatility window for vol_scaled_momentum and regime_switch")
-    cv.add_argument("--vol-threshold", dest="vol_threshold", type=float, default=0.02, help="Volatility threshold for regime_switch")
-    cv.add_argument("--arima-order", dest="arima_order", nargs=3, type=int, default=[1, 0, 1], metavar=("p", "d", "q"), help="ARIMA order for arima signal")
-    cv.add_argument("--ewma-span", dest="ewma_span", type=int, default=20, help="Span for EWMA momentum signal")
-    cv.add_argument("--ma-short", dest="ma_short", type=int, default=10, help="Short window for MA crossover signal")
-    cv.add_argument("--ma-long", dest="ma_long", type=int, default=50, help="Long window for MA crossover signal")
-    cv.set_defaults(func=cmd_cv)
-
-    # train subcommand for predictive meta‑labelling
-    train = sub.add_parser("train", help="Train and evaluate a predictive meta‑model")
-    train.add_argument("--lookback", type=int, default=20, help="Lookback window for momentum feature")
-    train.add_argument("--vol-span", dest="vol_span", type=int, default=50, help="Span for volatility estimate")
-    train.add_argument("--pt-mult", dest="pt_mult", type=float, default=1.0, help="Profit‑taking multiplier for triple barrier")
-    train.add_argument("--sl-mult", dest="sl_mult", type=float, default=1.0, help="Stop‑loss multiplier for triple barrier")
-    train.add_argument("--horizon", type=int, default=5, help="Vertical barrier horizon for triple barrier")
-    train.add_argument("--n-splits", dest="n_splits", type=int, default=5, help="Number of folds for CV")
-    train.add_argument("--embargo-pct", dest="embargo_pct", type=float, default=0.0, help="Embargo percentage between folds")
-    train.add_argument("--output", type=str, default="results_train", help="Output directory for training results")
-    # dataset options for train
-    train.add_argument("--csv", type=str, default=None, help="Path to CSV file containing price data")
-    train.add_argument("--tickers", type=str, default=None, help="Comma‑separated list of tickers to fetch from yfinance")
-    train.add_argument("--start-date", dest="start_date", type=str, default=None, help="Start date for yfinance data in YYYY‑MM‑DD format")
-    train.add_argument("--end-date", dest="end_date", type=str, default=None, help="End date for yfinance data in YYYY‑MM‑DD format")
-    train.add_argument("--interval", dest="interval", type=str, default="1d", help="Sampling interval for yfinance data")
-    train.set_defaults(func=cmd_train)
-    return p
-
-
-# --- New subcommand implementations ---
-
-def _load_prices_for_cli(args: argparse.Namespace) -> pd.DataFrame:
-    """Helper to load prices based on CLI arguments.
-
-    This function encapsulates the logic for loading price data from a
-    CSV, Yahoo Finance or synthetic generator based on mutually
-    exclusive CLI options.  It is shared across multiple subcommands.
-
-    Parameters
-    ----------
-    args : Namespace
-        Parsed command‑line arguments containing the dataset options.
-
-    Returns
-    -------
-    DataFrame
-        Price data indexed by datetime with asset columns.
-    """
-    if getattr(args, "csv", None):
-        return load_csv_prices(args.csv)
-    if getattr(args, "tickers", None):
-        tickers = [t.strip() for t in args.tickers.split(",") if t.strip()]
-        return load_yfinance_prices(
-            tickers=tickers,
-            start=args.start_date,
-            end=args.end_date,
-            interval=args.interval,
-        )
-    # synthetic fallback
-    names = getattr(args, "names", 20)
-    days = getattr(args, "days", 750)
-    seed = getattr(args, "seed", 42)
-    return load_synthetic_prices(n_names=names, n_days=days, seed=seed)
+    print(json.dumps(result.metrics, indent=2))
 
 
 def cmd_cv(args: argparse.Namespace) -> None:
-    """Estimate Sharpe ratio distribution via purged cross‑validation.
+    """Estimate Sharpe ratio distribution via purged cross-validation.
 
-    This command runs a full backtest on the supplied price data and
-    then applies purged k‑fold (or combinatorial) cross‑validation on
-    the resulting daily returns to estimate a distribution of
-    out‑of‑sample Sharpe ratios.  The distribution and summary
-    statistics are saved as JSON in the output directory and printed
-    to stdout.
+    Runs the full signal + backtest pipeline, then applies purged
+    k-fold (or combinatorial) CV on the daily returns to produce
+    a distribution of out-of-sample Sharpe ratios.
     """
-    import pandas as pd  # local import to avoid CLI import cycles
-    # load prices
     prices = _load_prices_for_cli(args)
-    # build signal kwargs from args
-    signal_kwargs = {
+
+    signal_kwargs: dict[str, Any] = {
         "vol_window": args.vol_window,
         "vol_threshold": args.vol_threshold,
         "arima_order": tuple(args.arima_order),
@@ -316,7 +368,7 @@ def cmd_cv(args: argparse.Namespace) -> None:
         "ma_short": args.ma_short,
         "ma_long": args.ma_long,
     }
-    # compute Sharpe ratios across folds
+
     sharpe_values = cross_validate_sharpe(
         prices=prices,
         signal_type=args.signal,
@@ -325,17 +377,17 @@ def cmd_cv(args: argparse.Namespace) -> None:
         cost_bps=args.cost_bps,
         n_splits=args.n_splits,
         embargo_pct=args.embargo_pct,
-        combinatorial=args.combinatorial,
-        test_fold_size=args.test_fold_size,
+        combinatorial=getattr(args, "combinatorial", False),
+        test_fold_size=getattr(args, "test_fold_size", 1),
         **signal_kwargs,
     )
-    # summarise distribution
+
     if len(sharpe_values) > 0:
-        import numpy as np  # local import
-        summary = {
+        summary: dict[str, Any] = {
             "sharpe_values": sharpe_values,
             "mean": float(np.mean(sharpe_values)),
             "std": float(np.std(sharpe_values, ddof=0)),
+            "median": float(np.median(sharpe_values)),
             "min": float(np.min(sharpe_values)),
             "max": float(np.max(sharpe_values)),
             "n_folds": len(sharpe_values),
@@ -345,11 +397,12 @@ def cmd_cv(args: argparse.Namespace) -> None:
             "sharpe_values": [],
             "mean": float("nan"),
             "std": float("nan"),
+            "median": float("nan"),
             "min": float("nan"),
             "max": float("nan"),
             "n_folds": 0,
         }
-    # ensure output directory
+
     out_dir = Path(args.output).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "cv_metrics.json").write_text(json.dumps(summary, indent=2))
@@ -357,23 +410,20 @@ def cmd_cv(args: argparse.Namespace) -> None:
 
 
 def cmd_train(args: argparse.Namespace) -> None:
-    """Train meta‑models on each asset and report CV accuracy.
+    """Train meta-models per asset and report CV accuracy.
 
-    This command iterates over each asset in the price data, constructs
-    momentum features and meta‑labels, fits a logistic regression model
-    using purged k‑fold cross‑validation and reports the mean and
-    standard deviation of the classification accuracy.  Results are
-    saved per asset as well as aggregated across all assets.
+    Iterates over each asset, constructs momentum features and
+    triple-barrier meta-labels, fits a logistic regression model
+    with purged k-fold CV, and reports classification accuracy.
     """
-    import numpy as np  # local import to avoid module level dependency
-    # load prices
     prices = _load_prices_for_cli(args)
-    # prepare output directory
+
     out_dir = Path(args.output).resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
-    asset_metrics = {}
-    # iterate over columns (assets)
+
+    asset_metrics: dict[str, Any] = {}
     for col in prices.columns:
+        logger.info("Training meta-model for %s", col)
         series = prices[col].astype(float)
         metrics = train_meta_model(
             prices=series,
@@ -385,27 +435,326 @@ def cmd_train(args: argparse.Namespace) -> None:
             embargo_pct=args.embargo_pct,
         )
         asset_metrics[col] = metrics
-    # aggregate metrics across assets
-    valid_values = [m["cv_accuracy_mean"] for m in asset_metrics.values() if not np.isnan(m["cv_accuracy_mean"])]
+
+    valid_values = [
+        m["cv_accuracy_mean"]
+        for m in asset_metrics.values()
+        if not np.isnan(m["cv_accuracy_mean"])
+    ]
     if len(valid_values) > 0:
         overall_mean = float(np.mean(valid_values))
         overall_std = float(np.std(valid_values, ddof=0))
     else:
         overall_mean = float("nan")
         overall_std = float("nan")
-    summary = {
+
+    summary: dict[str, Any] = {
         "asset_metrics": asset_metrics,
         "overall_mean_accuracy": overall_mean,
         "overall_std_accuracy": overall_std,
         "n_assets": len(asset_metrics),
     }
-    # write JSON file
+
     (out_dir / "train_metrics.json").write_text(json.dumps(summary, indent=2))
     print(json.dumps(summary, indent=2))
 
 
+def cmd_print_example(args: argparse.Namespace) -> None:
+    """Print an example configuration for the ``run`` subcommand."""
+    example = {
+        "lookback": 20,
+        "max_gross": 1.0,
+        "cost_bps": 10.0,
+        "names": 20,
+        "days": 750,
+        "output": "results",
+        "signal": "momentum",
+        "rebalance": "daily",
+        "impact_model": "proportional",
+    }
+    print(json.dumps(example, indent=2))
+
+
+# ---------------------------------------------------------------------------
+# Argument parser
+# ---------------------------------------------------------------------------
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Construct the top-level argument parser with all subcommands."""
+    parser = argparse.ArgumentParser(
+        prog="tsalpha",
+        description="Time-Series Alpha Signal CLI",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Enable DEBUG logging.",
+    )
+    sub = parser.add_subparsers(dest="cmd", required=True)
+
+    # -- run -------------------------------------------------------------
+    run = sub.add_parser("run", help="Run a single backtest.")
+    _add_dataset_args(run)
+    _add_signal_args(run)
+
+    run_bt = run.add_argument_group("backtest parameters")
+    run_bt.add_argument(
+        "--max-gross",
+        dest="max_gross",
+        type=float,
+        default=1.0,
+        help="Gross exposure limit (default: 1.0).",
+    )
+    run_bt.add_argument(
+        "--cost-bps",
+        dest="cost_bps",
+        type=float,
+        default=10.0,
+        help="Transaction cost in basis points (default: 10).",
+    )
+    run_bt.add_argument(
+        "--max-leverage",
+        dest="max_leverage",
+        type=float,
+        default=None,
+        help="Maximum gross leverage (optional).",
+    )
+    run_bt.add_argument(
+        "--max-drawdown",
+        dest="max_drawdown",
+        type=float,
+        default=None,
+        help="Drawdown stop as fraction (e.g. 0.2 for -20%%).",
+    )
+    run_bt.add_argument(
+        "--rebalance",
+        type=str,
+        default="daily",
+        choices=_REBALANCE_CHOICES,
+        help="Rebalance frequency (default: daily).",
+    )
+    run_bt.add_argument(
+        "--impact-model",
+        dest="impact_model",
+        type=str,
+        default="proportional",
+        choices=_IMPACT_CHOICES,
+        help="Transaction cost model (default: proportional).",
+    )
+
+    run_out = run.add_argument_group("output")
+    run_out.add_argument(
+        "--names",
+        type=int,
+        default=20,
+        help="Number of synthetic assets (default: 20).",
+    )
+    run_out.add_argument(
+        "--days",
+        type=int,
+        default=750,
+        help="Number of synthetic days (default: 750).",
+    )
+    run_out.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for synthetic data generation.",
+    )
+    run_out.add_argument(
+        "--output",
+        type=str,
+        default="results",
+        help="Output directory (default: results).",
+    )
+    run_out.add_argument(
+        "--no-plots",
+        action="store_true",
+        help="Skip plot generation (useful in CI).",
+    )
+    run.set_defaults(func=cmd_run)
+
+    # -- cv --------------------------------------------------------------
+    cv = sub.add_parser("cv", help="Estimate out-of-sample Sharpe via purged CV.")
+    _add_dataset_args(cv)
+    _add_signal_args(cv)
+
+    cv_params = cv.add_argument_group("cross-validation parameters")
+    cv_params.add_argument(
+        "--max-gross",
+        dest="max_gross",
+        type=float,
+        default=1.0,
+        help="Gross exposure limit (default: 1.0).",
+    )
+    cv_params.add_argument(
+        "--cost-bps",
+        dest="cost_bps",
+        type=float,
+        default=10.0,
+        help="Transaction cost in basis points (default: 10).",
+    )
+    cv_params.add_argument(
+        "--n-splits",
+        dest="n_splits",
+        type=int,
+        default=5,
+        help="Number of CV folds (default: 5).",
+    )
+    cv_params.add_argument(
+        "--embargo-pct",
+        dest="embargo_pct",
+        type=float,
+        default=0.0,
+        help="Embargo fraction between folds (default: 0.0).",
+    )
+    cv_params.add_argument(
+        "--combinatorial",
+        action="store_true",
+        help="Use combinatorial purged CV instead of standard k-fold.",
+    )
+    cv_params.add_argument(
+        "--test-fold-size",
+        dest="test_fold_size",
+        type=int,
+        default=1,
+        help="Test fold size for combinatorial CV (default: 1).",
+    )
+
+    cv_out = cv.add_argument_group("output")
+    cv_out.add_argument(
+        "--names",
+        type=int,
+        default=20,
+        help="Number of synthetic assets (default: 20).",
+    )
+    cv_out.add_argument(
+        "--days",
+        type=int,
+        default=750,
+        help="Number of synthetic days (default: 750).",
+    )
+    cv_out.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for synthetic data.",
+    )
+    cv_out.add_argument(
+        "--output",
+        type=str,
+        default="results_cv",
+        help="Output directory (default: results_cv).",
+    )
+    cv.set_defaults(func=cmd_cv)
+
+    # -- train -----------------------------------------------------------
+    train = sub.add_parser(
+        "train", help="Train and evaluate a predictive meta-model."
+    )
+    _add_dataset_args(train)
+
+    train_params = train.add_argument_group("training parameters")
+    train_params.add_argument(
+        "--lookback",
+        type=int,
+        default=20,
+        help="Lookback window for momentum feature (default: 20).",
+    )
+    train_params.add_argument(
+        "--vol-span",
+        dest="vol_span",
+        type=int,
+        default=50,
+        help="Span for volatility estimate (default: 50).",
+    )
+    train_params.add_argument(
+        "--pt-mult",
+        dest="pt_mult",
+        type=float,
+        default=1.0,
+        help="Profit-taking multiplier for triple barrier (default: 1.0).",
+    )
+    train_params.add_argument(
+        "--sl-mult",
+        dest="sl_mult",
+        type=float,
+        default=1.0,
+        help="Stop-loss multiplier for triple barrier (default: 1.0).",
+    )
+    train_params.add_argument(
+        "--horizon",
+        type=int,
+        default=5,
+        help="Vertical barrier horizon in days (default: 5).",
+    )
+    train_params.add_argument(
+        "--n-splits",
+        dest="n_splits",
+        type=int,
+        default=5,
+        help="Number of CV folds (default: 5).",
+    )
+    train_params.add_argument(
+        "--embargo-pct",
+        dest="embargo_pct",
+        type=float,
+        default=0.0,
+        help="Embargo fraction between folds (default: 0.0).",
+    )
+
+    train_out = train.add_argument_group("output")
+    train_out.add_argument(
+        "--names",
+        type=int,
+        default=20,
+        help="Number of synthetic assets (default: 20).",
+    )
+    train_out.add_argument(
+        "--days",
+        type=int,
+        default=750,
+        help="Number of synthetic days (default: 750).",
+    )
+    train_out.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for synthetic data.",
+    )
+    train_out.add_argument(
+        "--output",
+        type=str,
+        default="results_train",
+        help="Output directory (default: results_train).",
+    )
+    train.set_defaults(func=cmd_train)
+
+    # -- example ---------------------------------------------------------
+    ex = sub.add_parser("example", help="Print example config.")
+    ex.set_defaults(func=cmd_print_example)
+
+    return parser
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
 def main() -> None:
-    """Entry point for command‑line execution."""
+    """Entry point for ``python -m time_series_alpha_signal.cli``."""
     parser = build_parser()
     args = parser.parse_args()
+
+    # Configure logging based on --verbose flag
+    level = logging.DEBUG if getattr(args, "verbose", False) else logging.INFO
+    logging.basicConfig(
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        level=level,
+        stream=sys.stderr,
+    )
+
     args.func(args)
