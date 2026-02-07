@@ -12,8 +12,19 @@ dependencies = [
   "pandas>=2.0",
   "numpy>=1.23",
   "matplotlib>=3.7",
+  "scipy>=1.10",
+  "scikit-learn>=1.2",
+  "yfinance>=0.2",
+]
+
+[project.optional-dependencies]
+arima = ["statsmodels>=0.13"]
+dev = [
+  "pytest>=7.0",
+  "pytest-cov>=4.0",
+  "ruff>=0.1",
+  "mypy>=1.0",
   "statsmodels>=0.13",
-  "yfinance>=0.2"
 ]
 
 [project.scripts]
@@ -26,11 +37,22 @@ packages = ["time_series_alpha_signal"]
 # Ruff configuration for linting
 [tool.ruff]
 line-length = 100
-select = ["E", "F", "W", "B"]
+select = ["E", "F", "W", "B", "I", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["time_series_alpha_signal"]
 
 # Mypy configuration
 [tool.mypy]
 python_version = "3.11"
 check_untyped_defs = true
 ignore_missing_imports = true
-strict_optional = false
+strict_optional = true
+warn_return_any = true
+warn_unused_configs = true
+warn_redundant_casts = true
+
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
