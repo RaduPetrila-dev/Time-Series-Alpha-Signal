@@ -24,7 +24,6 @@ from __future__ import annotations
 import logging
 import warnings
 from dataclasses import dataclass
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
@@ -34,11 +33,9 @@ from .labels import daily_volatility, meta_label, triple_barrier_labels
 
 logger = logging.getLogger(__name__)
 
-
 # ---------------------------------------------------------------------------
 # Result container
 # ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class MetaModelResult:
@@ -78,11 +75,9 @@ class MetaModelResult:
             "n_negative": self.n_negative,
         }
 
-
 # ---------------------------------------------------------------------------
 # Realised returns (vectorised)
 # ---------------------------------------------------------------------------
-
 
 def _compute_realized_returns(
     prices: pd.Series,
@@ -124,11 +119,9 @@ def _compute_realized_returns(
 
     return pd.Series(returns, index=events.index, dtype=float)
 
-
 # ---------------------------------------------------------------------------
 # Feature construction
 # ---------------------------------------------------------------------------
-
 
 def build_features(
     prices: pd.Series,
@@ -186,17 +179,15 @@ def build_features(
 
     return features
 
-
 # ---------------------------------------------------------------------------
 # Model training
 # ---------------------------------------------------------------------------
-
 
 def train_meta_model(
     prices: pd.Series,
     lookback: int = 20,
     vol_span: int = 50,
-    pt_sl: Tuple[float, float] = (1.0, 1.0),
+    pt_sl: tuple[float, float] = (1.0, 1.0),
     horizon: int = 5,
     n_splits: int = 5,
     embargo_pct: float = 0.0,
