@@ -1,68 +1,103 @@
+"""Triple-barrier labelling and meta-labels for event-driven strategies.
+
+This module implements the **triple-barrier method** described in:
+
+    Lopez de Prado, M. (2018). *Advances in Financial Machine Learning*.
+    Wiley. Chapter 3.
+
+The triple-barrier method assigns a label to each event based on which
+of three conditions is met first:
+
+1. **Profit-taking barrier** -- price rises above a threshold scaled by
+   local volatility.  Label = +1.
+2. **Stop-loss barrier** -- price falls below a threshold scaled by
+   local volatility.  Label = -1.
+3. **Vertical barrier** -- a fixed time horizon expires.  Label = sign
+   of the return at expiry.
+
+When *both* the profit-taking and stop-loss barriers are breached in the
+same window the barrier that was hit **first** (earliest timestamp)
+takes priority.  This is a correction over naive implementations that
+check ``.any()`` without regard to ordering.
+
+Meta-labels (:func:`meta_label`) indicate whether a base classifier's
+directional prediction was correct, enabling a secondary model to learn
+*bet sizing*.
+"""
+
 from __future__ import annotations
 
-from typing import Dict, Tuple
+import logging
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
 
+logger = logging.getLogger(__name__)
 
-def daily_volatility(prices: pd.Series, span: int = 100) -> pd.Series:
-    """Estimate daily volatility using an exponential moving standard deviation.
 
-    This helper computes the rolling standard deviation of daily returns
-    using an exponential weighting scheme.  A larger ``span`` produces
-    a smoother estimate that reacts more slowly to changes in
-    volatility.  The resulting series is aligned to the input
-    ``prices`` index and forward‑filled for any initial missing values.
+# ---------------------------------------------------------------------------
+# Volatility estimation
+# ---------------------------------------------------------------------------
+
+
+def daily_volatility(
+    prices: pd.Series,
+    span: int = 100,
+) -> pd.Series:
+    """Estimate daily volatility via exponentially-weighted std of returns.
 
     Parameters
     ----------
     prices : Series
         Price series indexed by datetime.
     span : int, default 100
-        Span parameter for the exponential moving standard deviation.  A
-        larger span results in a smoother volatility estimate.
+        EWM span.  Larger values produce smoother estimates.
 
     Returns
     -------
     Series
-        Estimated daily volatility of returns, forward‑filled for
-        leading NaNs.
+        Daily volatility estimate, back-filled for leading NaNs.
     """
     returns = prices.pct_change()
     vol = returns.ewm(span=span, adjust=False).std()
-    return vol.fillna(method="bfill")
+    return vol.bfill()
 
 
-def get_vertical_barriers(prices: pd.Series, horizon: int) -> pd.Series:
-    """Locate the vertical barrier (time limit) for each event.
+# ---------------------------------------------------------------------------
+# Barrier construction
+# ---------------------------------------------------------------------------
 
-    For each timestamp in ``prices``, this function computes the end time
-    at a fixed forward horizon.  If the horizon extends beyond the
-    available data, the end time is set to the last index.  This helper
-    is used internally by :func:`get_events` to define the maximum
-    holding period for each event.
+
+def get_vertical_barriers(
+    prices: pd.Series,
+    horizon: int,
+) -> pd.Series:
+    """Map each timestamp to its vertical barrier (time limit).
 
     Parameters
     ----------
     prices : Series
         Price series indexed by datetime.
     horizon : int
-        Number of observations between the event start and the vertical
-        barrier.  For daily data a horizon of 20 means the event is
-        evaluated over the next 20 trading days.
+        Forward look (number of index steps).
 
     Returns
     -------
     Series
-        Series mapping each start time to the corresponding end time.
+        Maps each start time to the end time.
+
+    Raises
+    ------
+    ValueError
+        If *horizon* < 1.
     """
+    if horizon < 1:
+        raise ValueError(f"horizon must be >= 1, got {horizon}")
+
     idx = prices.index
-    if horizon <= 0:
-        raise ValueError("horizon must be a positive integer")
-    # For each timestamp find the index position horizon steps ahead
     pos = np.arange(len(idx)) + horizon
-    pos[pos >= len(idx)] = len(idx) - 1
+    pos = np.clip(pos, 0, len(idx) - 1)
     return pd.Series(idx[pos], index=idx)
 
 
@@ -72,106 +107,166 @@ def get_events(
     pt_sl: Tuple[float, float] = (1.0, 1.0),
     horizon: int = 20,
 ) -> pd.DataFrame:
-    """Construct the events table for the triple‑barrier method.
+    """Construct the events table for the triple-barrier method.
 
-    An event begins at each observation in ``prices`` and ends when one
-    of three conditions is met: the price hits a profit‑taking or stop‑loss
-    barrier scaled by the local volatility, or a fixed time horizon is
-    reached.  The barriers are determined by ``pt_sl``, which specify
-    multipliers on the volatility estimate ``vol``.  Events with missing
-    volatility are omitted.
+    Each event starts at a price observation and defines profit-taking
+    and stop-loss levels scaled by local volatility, plus a vertical
+    barrier at ``t + horizon``.
 
     Parameters
     ----------
     prices : Series
-        Price series indexed by datetime.
+        Price series.
     vol : Series
-        Volatility estimate aligned to ``prices`` (e.g. from
-        :func:`daily_volatility`).  Events with missing or non‑positive
-        volatility are ignored.
+        Volatility estimate aligned to *prices*.
     pt_sl : tuple of float, default (1.0, 1.0)
-        Multipliers for the profit‑taking and stop‑loss barriers.
+        ``(profit_taking_mult, stop_loss_mult)`` applied to *vol*.
     horizon : int, default 20
-        Maximum number of periods to hold the position.  The vertical
-        barrier is located at ``t + horizon``.
+        Vertical barrier in index steps.
 
     Returns
     -------
     DataFrame
-        Events table with columns ``t1`` (vertical barrier time),
-        ``pt`` (profit‑taking price) and ``sl`` (stop‑loss price).  The
-        index represents the event start time ``t0``.
+        Columns: ``t1`` (vertical barrier), ``pt`` (profit-taking
+        price), ``sl`` (stop-loss price).  Index = event start ``t0``.
+        Rows with non-positive volatility are dropped.
     """
     if len(prices) != len(vol):
-        raise ValueError("prices and vol must be of the same length")
+        raise ValueError(
+            f"prices ({len(prices)}) and vol ({len(vol)}) length mismatch."
+        )
+
     vb = get_vertical_barriers(prices, horizon)
-    df0 = pd.DataFrame(index=prices.index)
-    df0["t1"] = vb
-    # scale barriers by volatility; forward‑fill vol to handle leading NaNs
-    vol_filled = vol.fillna(method="bfill").fillna(method="ffill")
-    df0["pt"] = prices * (1 + pt_sl[0] * vol_filled)
-    df0["sl"] = prices * (1 - pt_sl[1] * vol_filled)
-    # drop rows where volatility is non‑positive (invalid)
-    df0 = df0[vol_filled > 0]
-    return df0
+    vol_filled = vol.bfill().ffill()
+
+    df = pd.DataFrame(
+        {
+            "t1": vb,
+            "pt": prices * (1 + pt_sl[0] * vol_filled),
+            "sl": prices * (1 - pt_sl[1] * vol_filled),
+        },
+        index=prices.index,
+    )
+
+    # Drop invalid rows
+    valid = vol_filled > 0
+    n_dropped = (~valid).sum()
+    if n_dropped > 0:
+        logger.debug(
+            "Dropped %d events with non-positive volatility.", n_dropped
+        )
+    return df.loc[valid]
+
+
+# ---------------------------------------------------------------------------
+# Triple-barrier labelling
+# ---------------------------------------------------------------------------
+
+
+def _label_single_event(
+    prices: pd.Series,
+    t0: pd.Timestamp,
+    t1: pd.Timestamp,
+    pt: float,
+    sl: float,
+) -> int:
+    """Assign a label to a single event based on barrier hits.
+
+    When both barriers are hit in the same window, the one hit
+    **first** (earliest index position) wins.
+
+    Returns
+    -------
+    int
+        +1 (profit-taking), -1 (stop-loss), or sign of terminal return.
+    """
+    if t1 <= t0:
+        return 0
+
+    window = prices.loc[t0:t1]
+    if window.empty:
+        return 0
+
+    # Find the first time each barrier is breached (NaT if never)
+    pt_hits = window.index[window >= pt]
+    sl_hits = window.index[window <= sl]
+
+    first_pt = pt_hits[0] if len(pt_hits) > 0 else pd.NaT
+    first_sl = sl_hits[0] if len(sl_hits) > 0 else pd.NaT
+
+    # Determine which barrier was hit first
+    pt_hit = not pd.isna(first_pt)
+    sl_hit = not pd.isna(first_sl)
+
+    if pt_hit and sl_hit:
+        # Both hit: earliest wins
+        if first_pt <= first_sl:
+            return 1
+        return -1
+    if pt_hit:
+        return 1
+    if sl_hit:
+        return -1
+
+    # Vertical barrier: sign of return
+    terminal_return = window.iloc[-1] - prices.loc[t0]
+    return int(np.sign(terminal_return))
 
 
 def apply_triple_barrier(
     prices: pd.Series,
     events: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Assign labels to events using the triple‑barrier method.
+    """Assign labels to events using the triple-barrier method.
 
-    For each event defined by ``events`` this function scans the price
-    path between the start time ``t0`` and the vertical barrier ``t1``.
-    If the price exceeds the profit‑taking level before hitting the
-    stop‑loss level the label is +1.  If the stop‑loss is hit first the
-    label is −1.  Otherwise the label is the sign of the return at the
-    vertical barrier.  The resulting DataFrame has the same index as
-    ``events`` and columns ``y`` (label) and ``t1`` (end time).
+    For each event the price path is scanned from ``t0`` to ``t1``.
+    The label is determined by which barrier is hit first:
+
+    * +1 if the profit-taking barrier is hit first.
+    * -1 if the stop-loss barrier is hit first.
+    * sign(return) at the vertical barrier if neither is hit.
+
+    When **both** barriers are breached within the window, the one
+    with the **earlier** timestamp takes priority.
 
     Parameters
     ----------
     prices : Series
-        Price series indexed by datetime.
+        Full price series.
     events : DataFrame
-        Event definitions with columns ``t1``, ``pt`` and ``sl``.
+        Must contain ``t1``, ``pt``, ``sl`` columns.  Index = ``t0``.
 
     Returns
     -------
     DataFrame
-        Events with an additional column ``y`` containing the labels.
+        Columns ``t1`` and ``y`` (label), indexed by ``t0``.
     """
-    out = events.copy()
-    # allocate label array
-    labels = np.zeros(len(out), dtype=int)
-    # iterate over events
-    for i, (t0, row) in enumerate(out.iterrows()):
-        t1 = row["t1"]
-        pt = row["pt"]
-        sl = row["sl"]
-        # ensure t0 < t1
-        if t1 <= t0:
-            labels[i] = 0
-            continue
-        # price window from t0 to t1 inclusive
-        window = prices.loc[t0:t1]
-        # skip if empty
-        if window.empty:
-            labels[i] = 0
-            continue
-        hit_pt = (window >= pt).any()
-        hit_sl = (window <= sl).any()
-        if hit_pt and not hit_sl:
-            labels[i] = 1
-        elif hit_sl and not hit_pt:
-            labels[i] = -1
-        else:
-            # vertical barrier: assign sign of return
-            labels[i] = int(np.sign(window.iloc[-1] - prices.loc[t0]))
-    out = out.rename(columns={"pt": "pt", "sl": "sl"})
-    out["y"] = labels
-    return out[["t1", "y"]]
+    labels = np.empty(len(events), dtype=int)
+
+    for i, (t0, row) in enumerate(events.iterrows()):
+        labels[i] = _label_single_event(
+            prices, t0, row["t1"], row["pt"], row["sl"]
+        )
+
+    result = pd.DataFrame(
+        {"t1": events["t1"].values, "y": labels},
+        index=events.index,
+    )
+
+    # Log label distribution
+    counts = pd.Series(labels).value_counts().to_dict()
+    logger.debug(
+        "Triple-barrier labels: %d events, distribution: %s",
+        len(labels),
+        counts,
+    )
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Convenience wrapper
+# ---------------------------------------------------------------------------
 
 
 def triple_barrier_labels(
@@ -179,75 +274,92 @@ def triple_barrier_labels(
     vol: pd.Series | None = None,
     pt_sl: Tuple[float, float] = (1.0, 1.0),
     horizon: int = 20,
+    vol_span: int = 100,
 ) -> pd.DataFrame:
-    """Apply the triple‑barrier method to generate event labels.
+    """End-to-end triple-barrier labelling.
 
-    A wrapper around :func:`get_events` and :func:`apply_triple_barrier`
-    that handles volatility estimation and missing values.  If ``vol``
-    is not provided the daily volatility is estimated via
-    :func:`daily_volatility`.  The profit‑taking and stop‑loss barriers
-    are scaled by ``pt_sl`` and the time limit is set by ``horizon``.
+    Wraps :func:`daily_volatility`, :func:`get_events`, and
+    :func:`apply_triple_barrier` into a single call.
 
     Parameters
     ----------
     prices : Series
         Price series indexed by datetime.
     vol : Series, optional
-        Volatility estimate aligned to ``prices``.  If ``None`` the
-        volatility is computed automatically.
+        Pre-computed volatility.  If ``None``, estimated via
+        :func:`daily_volatility` with *vol_span*.
     pt_sl : tuple of float, default (1.0, 1.0)
-        Multipliers for the profit‑taking and stop‑loss barriers.
+        ``(profit_taking_mult, stop_loss_mult)``.
     horizon : int, default 20
-        Maximum number of periods to hold the position.
+        Vertical barrier in index steps.
+    vol_span : int, default 100
+        EWM span for volatility estimation (used when *vol* is None).
 
     Returns
     -------
     DataFrame
-        DataFrame with columns ``t1`` and ``y`` (label).  The index
-        represents the event start time ``t0``.
+        Columns ``t1`` (barrier time) and ``y`` (label), indexed by
+        event start ``t0``.
     """
-    # compute volatility if not provided
     if vol is None:
-        vol = daily_volatility(prices)
-    # construct events table
+        vol = daily_volatility(prices, span=vol_span)
+
     events = get_events(prices, vol, pt_sl=pt_sl, horizon=horizon)
-    # drop events whose horizon goes beyond available data
-    events = events[events.index < events["t1"]]
-    # apply triple barrier logic to assign labels
-    labels_df = apply_triple_barrier(prices, events)
-    return labels_df
+
+    # Drop events whose start is at or beyond the vertical barrier
+    valid = events.index < events["t1"]
+    n_dropped = (~valid).sum()
+    if n_dropped > 0:
+        logger.debug(
+            "Dropped %d events at/beyond the vertical barrier.", n_dropped
+        )
+    events = events.loc[valid]
+
+    return apply_triple_barrier(prices, events)
+
+
+# ---------------------------------------------------------------------------
+# Meta-labels (vectorised)
+# ---------------------------------------------------------------------------
 
 
 def meta_label(
     base_labels: pd.Series,
     realized_returns: pd.Series,
 ) -> pd.Series:
-    """Compute meta‑labels for bet sizing.
+    """Compute binary meta-labels for bet sizing.
 
-    Given a series of base classification labels (+1, −1, 0) and the
-    realised returns associated with each event, the meta‑label is 1 if
-    the base label correctly predicts the direction of the return and 0
-    otherwise.  Neutral events (label 0) are assigned 0.
+    A meta-label is 1 if the base classifier's directional prediction
+    matches the sign of the realised return, and 0 otherwise.  Neutral
+    predictions (label = 0) always map to 0.
 
     Parameters
     ----------
     base_labels : Series
-        Base classification labels indexed by event start time ``t0``.
+        Base classifier labels (+1, -1, or 0).
     realized_returns : Series
-        Realised returns for each event, aligned to ``base_labels``.
+        Realised returns aligned to *base_labels*.
 
     Returns
     -------
     Series
-        Binary meta‑labels indicating whether the base prediction was
-        directionally correct.
+        Binary meta-labels (0 or 1).
+
+    Raises
+    ------
+    ValueError
+        If the indices do not match.
     """
     if not base_labels.index.equals(realized_returns.index):
-        raise ValueError("base_labels and realized_returns must share the same index")
-    meta = []
-    for lbl, ret in zip(base_labels, realized_returns):
-        if lbl == 0:
-            meta.append(0)
-        else:
-            meta.append(int(np.sign(ret) == lbl))
-    return pd.Series(meta, index=base_labels.index, dtype=int)
+        raise ValueError(
+            "base_labels and realized_returns must share the same index."
+        )
+
+    lbl = base_labels.values
+    ret_sign = np.sign(realized_returns.values)
+
+    # Vectorised: correct when label != 0 and sign matches
+    correct = (lbl != 0) & (ret_sign == lbl)
+    meta = correct.astype(int)
+
+    return pd.Series(meta, index=base_labels.index, dtype=int, name="meta_label")
