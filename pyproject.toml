@@ -37,6 +37,8 @@ packages = ["time_series_alpha_signal"]
 # Ruff configuration for linting
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 select = ["E", "F", "W", "B", "I", "UP"]
 
 [tool.ruff.lint.isort]
