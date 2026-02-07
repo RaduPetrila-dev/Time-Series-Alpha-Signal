@@ -13,8 +13,8 @@ import pandas as pd
 import pytest
 
 from time_series_alpha_signals.cv import PurgedKFold, make_event_table
-from time_series_alpha_signal.data import load_synthetic_prices
-from time_series_alpha_signal.evaluation import cross_validate_sharpe
+from time_series_alpha_signals.data import load_synthetic_prices
+from time_series_alpha_signals.evaluation import cross_validate_sharpe
 
 
 # ---------------------------------------------------------------------------
