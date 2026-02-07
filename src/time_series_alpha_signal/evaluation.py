@@ -1,42 +1,35 @@
+"""Evaluation helpers for cross-validated performance analysis.
+
+This module provides:
+
+* :func:`cross_validate_sharpe` -- estimate an out-of-sample Sharpe
+  ratio distribution using purged k-fold or combinatorial purged CV.
+* :func:`summarize_fold_metrics` -- compute a full performance summary
+  (CAGR, volatility, Sharpe, drawdown, Calmar, hit-rate, win/loss,
+  turnover) from a return series.
+
+Both functions are designed to work with the outputs of the backtesting
+pipeline in :mod:`time_series_alpha_signal.backtest`.
+"""
+
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Sequence
+import logging
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-from .backtest import backtest
-from .cv import PurgedKFold, combinatorial_purged_cv
+from .backtest import BacktestResult, backtest
+from .cv import PurgedKFold, combinatorial_purged_cv, make_event_table
 from .metrics import annualised_sharpe
 
+logger = logging.getLogger(__name__)
 
-def build_event_table(index: pd.DatetimeIndex) -> pd.DataFrame:
-    """Construct a simple events table from a date index.
 
-    Each row corresponds to one period.  The event starts at ``t0``
-    and ends at the next timestamp ``t1``.  The final observation is
-    dropped as it has no subsequent period.  This minimal event
-    definition is sufficient for cross‑sectional strategies where
-    returns at time ``t+1`` are predicted by signals computed at time
-    ``t``.
-
-    Parameters
-    ----------
-    index : DatetimeIndex
-        Index of the price series.
-
-    Returns
-    -------
-    DataFrame
-        Event table with columns ``t0`` and ``t1`` indexed by event
-        order.
-    """
-    if len(index) < 2:
-        raise ValueError("index must contain at least two timestamps")
-    t0 = index[:-1]
-    t1 = index[1:]
-    events = pd.DataFrame({"t0": t0, "t1": t1})
-    return events
+# ---------------------------------------------------------------------------
+# Cross-validated Sharpe distribution
+# ---------------------------------------------------------------------------
 
 
 def cross_validate_sharpe(
@@ -49,77 +42,75 @@ def cross_validate_sharpe(
     embargo_pct: float = 0.0,
     combinatorial: bool = False,
     test_fold_size: int = 1,
-    seed: int = 42,
-    **signal_kwargs: Dict[str, object],
-) -> List[float]:
-    """Estimate a distribution of Sharpe ratios using purged cross‑validation.
+    rebalance: str = "daily",
+    impact_model: str = "proportional",
+    **signal_kwargs: Any,
+) -> list[float]:
+    """Estimate a distribution of Sharpe ratios via purged CV.
 
-    This helper runs a single backtest on the full price dataset to
-    obtain daily net returns and then slices the returns according to
-    purged k‑fold splits.  For each split the annualised Sharpe ratio
-    is computed on the out‑of‑sample days.  When ``combinatorial`` is
-    ``True`` the combinatorial purged CV (CPCV) is used, enumerating
-    all combinations of test folds of size ``test_fold_size``【95993860354040†L629-L645】.
+    Runs a single backtest on the full dataset to obtain daily net
+    returns, then slices the returns into purged k-fold (or CPCV)
+    test windows and computes the annualised Sharpe ratio on each
+    out-of-sample segment.
 
     Parameters
     ----------
     prices : DataFrame
         Price series indexed by datetime with asset columns.
     signal_type : str, default "momentum"
-        Signal name passed to :func:`~time_series_alpha_signal.backtest.backtest`.
+        Signal name passed to :func:`backtest`.
     lookback : int, default 20
         Lookback window for simple signals.
     max_gross : float, default 1.0
-        Gross exposure limit for the portfolio.
+        Gross exposure limit.
     cost_bps : float, default 10.0
         Transaction cost in basis points.
     n_splits : int, default 5
-        Number of folds for cross‑validation.
+        Number of CV folds.
     embargo_pct : float, default 0.0
-        Fraction of the data to embargo after each test fold.
+        Embargo fraction after each test fold.
     combinatorial : bool, default False
-        If True use combinatorial purged CV; otherwise standard
-        purged k‑fold is used.
+        Use CPCV instead of standard purged k-fold.
     test_fold_size : int, default 1
-        Size of the test set in folds for CPCV.
-    seed : int, default 42
-        Random seed passed to the underlying backtest (currently
-        unused but reserved for reproducibility).
-    **signal_kwargs : dict
-        Additional keyword arguments forwarded to
-        :func:`~time_series_alpha_signal.backtest.backtest` depending on
-        the selected signal type.
+        Number of folds per test set (CPCV only).
+    rebalance : str, default "daily"
+        Rebalance frequency passed to :func:`backtest`.
+    impact_model : str, default "proportional"
+        Cost model passed to :func:`backtest`.
+    **signal_kwargs
+        Additional keyword arguments forwarded to :func:`backtest`
+        (e.g. ``vol_window``, ``ewma_span``).
 
     Returns
     -------
     list of float
-        List of annualised Sharpe ratios for each out‑of‑sample fold.
+        Annualised Sharpe ratio for each out-of-sample fold.
 
     Notes
     -----
-    This function assumes that the signal computation does not rely on
-    fitting a model on the training set.  For predictive models that
-    require training (e.g. machine learning classifiers) you should
-    train the model on the training subset within the loop and then
-    generate forecasts for the test subset.
+    This function assumes the signal is computed from a lagged window
+    and does not require fitting on the training set.  For ML-based
+    signals that need a train/predict loop per fold, implement the
+    loop yourself using :class:`PurgedKFold` directly.
     """
-    # ensure chronological ordering
     prices = prices.sort_index()
-    # run full backtest once; weights and returns are computed using a
-    # lagged signal and therefore do not look ahead
-    out = backtest(
+
+    result: BacktestResult = backtest(
         prices=prices,
         lookback=lookback,
         max_gross=max_gross,
         cost_bps=cost_bps,
-        seed=seed,
         signal_type=signal_type,
+        rebalance=rebalance,
+        impact_model=impact_model,
         **signal_kwargs,
     )
-    daily_returns: pd.Series = out["daily"]
-    # build minimal events table from price dates
-    events = build_event_table(prices.index)
-    # choose CV iterator
+    daily_returns: pd.Series = result.daily
+
+    # Build event table from price index (horizon=1 for daily returns)
+    events = make_event_table(prices.index, horizon=1)
+
+    # Select CV iterator
     if combinatorial:
         cv_iter = combinatorial_purged_cv(
             events=events,
@@ -130,87 +121,135 @@ def cross_validate_sharpe(
     else:
         cv = PurgedKFold(n_splits=n_splits, embargo_pct=embargo_pct)
         cv_iter = cv.split(events)
-    sharpe_values: List[float] = []
-    for train_idx, test_idx in cv_iter:
+
+    sharpe_values: list[float] = []
+    n_empty = 0
+
+    for fold_idx, (train_idx, test_idx) in enumerate(cv_iter):
         test_dates = events.iloc[test_idx]["t0"]
-        # slice returns to test period; drop NaNs to avoid invalid Sharpe
         fold_returns = daily_returns.reindex(test_dates).dropna()
+
         if len(fold_returns) == 0:
-            # skip empty folds (e.g. due to missing returns at start)
+            n_empty += 1
+            logger.warning("Fold %d: empty test returns, skipping.", fold_idx)
             continue
+
         sr = annualised_sharpe(fold_returns)
         sharpe_values.append(sr)
+        logger.debug(
+            "Fold %d: test_days=%d, Sharpe=%.3f",
+            fold_idx,
+            len(fold_returns),
+            sr,
+        )
+
+    if n_empty > 0:
+        logger.warning(
+            "%d of %d folds had empty test returns and were skipped.",
+            n_empty,
+            n_empty + len(sharpe_values),
+        )
+
+    logger.info(
+        "CV Sharpe distribution: n=%d, mean=%.3f, std=%.3f",
+        len(sharpe_values),
+        float(np.mean(sharpe_values)) if sharpe_values else float("nan"),
+        float(np.std(sharpe_values)) if sharpe_values else float("nan"),
+    )
+
     return sharpe_values
+
+
+# ---------------------------------------------------------------------------
+# Fold-level performance summary
+# ---------------------------------------------------------------------------
 
 
 def summarize_fold_metrics(
     returns: pd.Series,
-    weights: Optional[pd.DataFrame] = None,
-    costs_bps: float = 10.0,
+    weights: pd.DataFrame | None = None,
     periods_per_year: int = 252,
-) -> Dict[str, float]:
-    """Compute a suite of performance metrics for a return series.
-
-    Metrics include annualised CAGR, standard deviation, Sharpe ratio,
-    maximum drawdown, Calmar ratio (CAGR / |Max DD|), turnover and
-    average win/loss.  Turnover requires the corresponding weights.
+) -> dict[str, float]:
+    """Compute a full performance summary for a return series.
 
     Parameters
     ----------
     returns : Series
-        Net daily returns for the period.
+        Daily net returns.
     weights : DataFrame, optional
-        Daily portfolio weights aligned to ``returns``.  If provided,
-        turnover is computed as the average absolute change in weights.
-    costs_bps : float, default 10.0
-        Transaction cost used to compute gross returns from net
-        returns.  If weights is None the gross returns and cost cannot
-        be separated.
+        Portfolio weights aligned to *returns*.  Required for turnover
+        computation.
     periods_per_year : int, default 252
-        Number of trading periods per year.
+        Trading periods per year (used for annualisation).
 
     Returns
     -------
     dict
-        Dictionary of computed metrics.
+        Keys: ``cagr``, ``ann_vol``, ``sharpe``, ``max_drawdown``,
+        ``calmar``, ``hit_rate``, ``avg_win``, ``avg_loss``,
+        ``win_loss_ratio``, ``turnover``, ``n_days``.
+
+    Raises
+    ------
+    ValueError
+        If *returns* is empty after dropping NaNs.
     """
     r = returns.dropna().astype(float)
     if r.empty:
-        raise ValueError("returns must contain at least one observation")
-    days = r.shape[0]
-    # cumulative equity and drawdown
+        raise ValueError("returns must contain at least one observation.")
+
+    n_days = len(r)
+
+    # -- Equity and drawdown -----------------------------------------------
     equity = (1 + r).cumprod()
     dd = equity / equity.cummax() - 1
-    # CAGR
-    cagr = float((equity.iloc[-1] ** (periods_per_year / days) - 1))
-    # annualised stdev
-    stdev = float(np.sqrt(periods_per_year) * r.std(ddof=0))
-    # Sharpe ratio
-    sharpe = float(np.sqrt(periods_per_year) * r.mean() / (r.std(ddof=0) + 1e-12))
-    # Calmar ratio
     max_dd = float(dd.min())
-    calmar = sharpe / abs(max_dd) if max_dd != 0 else np.nan
-    # hit rate and average win/loss
+
+    # -- CAGR --------------------------------------------------------------
+    final_equity = float(equity.iloc[-1])
+    if final_equity > 0 and n_days > 0:
+        cagr = float(final_equity ** (periods_per_year / n_days) - 1)
+    else:
+        cagr = -1.0
+
+    # -- Annualised volatility ---------------------------------------------
+    ann_vol = float(np.sqrt(periods_per_year) * r.std(ddof=1))
+
+    # -- Sharpe ratio ------------------------------------------------------
+    vol = r.std(ddof=1)
+    sharpe = float(np.sqrt(periods_per_year) * r.mean() / vol) if vol > 0 else 0.0
+
+    # -- Calmar ratio (CAGR / |Max DD|, not Sharpe / |Max DD|) -------------
+    calmar = cagr / abs(max_dd) if max_dd != 0 else 0.0
+
+    # -- Hit rate ----------------------------------------------------------
     wins = r[r > 0]
     losses = r[r < 0]
-    hit_rate = float(len(wins) / len(r))
+    total_trades = len(wins) + len(losses)
+    hit_rate = float(len(wins) / total_trades) if total_trades > 0 else 0.0
+
+    # -- Average win / average loss ----------------------------------------
     avg_win = float(wins.mean()) if not wins.empty else 0.0
     avg_loss = float(losses.mean()) if not losses.empty else 0.0
-    # turnover if weights provided
+    win_loss_ratio = abs(avg_win / avg_loss) if avg_loss != 0 else 0.0
+
+    # -- Turnover ----------------------------------------------------------
     if weights is not None:
         w = weights.reindex(r.index)
         turnover = float(w.diff().abs().sum(axis=1).mean())
     else:
-        turnover = np.nan
+        turnover = float("nan")
+
     return {
         "cagr": cagr,
-        "stdev": stdev,
+        "ann_vol": ann_vol,
         "sharpe": sharpe,
         "max_drawdown": max_dd,
         "calmar": calmar,
         "hit_rate": hit_rate,
         "avg_win": avg_win,
         "avg_loss": avg_loss,
+        "win_loss_ratio": win_loss_ratio,
         "turnover": turnover,
-        "n_days": days,
+        "n_days": n_days,
     }
