@@ -22,10 +22,9 @@ jobs:
         run: |
           set -e
           python -m pip install --upgrade pip
-          pip install -e .
-          pip install yfinance statsmodels matplotlib
+          pip install -e ".[dev,arima]"
 
-      - name: Run backtest
+      - name: Run EWMA backtest
         run: |
           set -e
           python -m time_series_alpha_signal.cli run \
@@ -33,7 +32,19 @@ jobs:
             --start-date 2018-01-01 --end-date 2023-12-31 \
             --signal ewma_momentum --ewma-span 30 \
             --max-gross 1.0 --cost-bps 10 \
+            --rebalance daily --impact-model proportional \
             --output results/faang_ewma_2018_2023
+
+      - name: Run momentum backtest
+        run: |
+          set -e
+          python -m time_series_alpha_signal.cli run \
+            --tickers AAPL,AMZN,GOOGL,META,NFLX \
+            --start-date 2018-01-01 --end-date 2023-12-31 \
+            --signal momentum --lookback 20 \
+            --max-gross 1.0 --cost-bps 10 \
+            --rebalance weekly --impact-model sqrt \
+            --output results/faang_momentum_2018_2023
 
       - name: Summarise metrics
         shell: bash
@@ -42,9 +53,14 @@ jobs:
           import json, pathlib
           root = pathlib.Path("results")
           lines = []
-          for m in root.rglob("metrics.json"):
+          for m in sorted(root.rglob("metrics.json")):
               d = json.loads(m.read_text())
-              lines.append(f"{m.parent.name}: Sharpe={d.get('sharpe', float('nan')):.2f}, CAGR={d.get('cagr', float('nan')):.4f}, MaxDD={d.get('max_dd', float('nan')):.2%}")
+              lines.append(
+                  f"{m.parent.name}: "
+                  f"Sharpe={d.get('sharpe', float('nan')):.2f}, "
+                  f"CAGR={d.get('cagr', float('nan')):.4f}, "
+                  f"MaxDD={d.get('max_dd', float('nan')):.2%}"
+              )
           print("\n".join(lines))
           PY
 
