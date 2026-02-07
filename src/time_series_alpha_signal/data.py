@@ -91,9 +91,7 @@ def load_synthetic_prices(
         raise ValueError(f"n_days must be >= 1, got {n_days}")
 
     rng = np.random.default_rng(seed)
-    dates = pd.bdate_range(
-        end=pd.Timestamp.today().normalize(), periods=n_days
-    )
+    dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=n_days)
     names = [f"SYM{i:03d}" for i in range(n_names)]
 
     dt = 1.0 / 252.0
@@ -107,8 +105,7 @@ def load_synthetic_prices(
     df = pd.DataFrame(prices, index=dates, columns=names).round(4)
 
     logger.info(
-        "Generated synthetic prices: %d assets x %d days "
-        "(drift=%.2f, vol=%.2f).",
+        "Generated synthetic prices: %d assets x %d days (drift=%.2f, vol=%.2f).",
         n_names,
         n_days,
         annual_drift,
@@ -160,18 +157,14 @@ def load_csv_prices(
     df = pd.read_csv(filepath, parse_dates=[date_col])
 
     if date_col not in df.columns:
-        raise KeyError(
-            f"Date column '{date_col}' not found. "
-            f"Available columns: {list(df.columns)}"
-        )
+        raise KeyError(f"Date column '{date_col}' not found. Available columns: {list(df.columns)}")
 
     df = df.set_index(date_col)
     price_df = df.select_dtypes(include=[np.number]).copy()
 
     if price_df.empty:
         raise ValueError(
-            "No numeric columns found in the CSV after removing "
-            f"the date column '{date_col}'."
+            f"No numeric columns found in the CSV after removing the date column '{date_col}'."
         )
 
     price_df.index = pd.to_datetime(price_df.index)
@@ -243,10 +236,7 @@ def load_yfinance_prices(
         If *tickers* is empty or no data is returned.
     """
     if yf is None:
-        raise ImportError(
-            "yfinance is not installed. "
-            "Install it with: pip install yfinance"
-        )
+        raise ImportError("yfinance is not installed. Install it with: pip install yfinance")
     if not tickers:
         raise ValueError("tickers list is empty.")
 
@@ -266,8 +256,7 @@ def load_yfinance_prices(
 
     if data.empty:
         raise ValueError(
-            f"yfinance returned no data for tickers={tickers}, "
-            f"start={start}, end={end}."
+            f"yfinance returned no data for tickers={tickers}, start={start}, end={end}."
         )
 
     # Extract the price column from the (possibly multi-level) DataFrame.
@@ -309,8 +298,7 @@ def load_yfinance_prices(
             )
 
     logger.info(
-        "yfinance prices: %d rows x %d tickers, "
-        "from %s to %s.",
+        "yfinance prices: %d rows x %d tickers, from %s to %s.",
         len(prices),
         prices.shape[1],
         prices.index[0].date() if len(prices) > 0 else "N/A",

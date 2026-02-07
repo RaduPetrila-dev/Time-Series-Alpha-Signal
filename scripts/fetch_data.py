@@ -45,12 +45,29 @@ UNIVERSES: dict[str, list[str]] = {
     "faang": ["AAPL", "AMZN", "GOOGL", "META", "NFLX"],
     "mag7": ["AAPL", "AMZN", "GOOGL", "META", "MSFT", "NVDA", "TSLA"],
     "sp500_top10": [
-        "AAPL", "MSFT", "AMZN", "NVDA", "GOOGL",
-        "META", "BRK-B", "LLY", "AVGO", "JPM",
+        "AAPL",
+        "MSFT",
+        "AMZN",
+        "NVDA",
+        "GOOGL",
+        "META",
+        "BRK-B",
+        "LLY",
+        "AVGO",
+        "JPM",
     ],
     "sectors_etf": [
-        "XLK", "XLF", "XLV", "XLE", "XLI",
-        "XLY", "XLP", "XLU", "XLRE", "XLB", "XLC",
+        "XLK",
+        "XLF",
+        "XLV",
+        "XLE",
+        "XLI",
+        "XLY",
+        "XLP",
+        "XLU",
+        "XLRE",
+        "XLB",
+        "XLC",
     ],
 }
 
@@ -98,9 +115,7 @@ def fetch_prices(
     try:
         import yfinance as yf
     except ImportError as exc:
-        raise ImportError(
-            "yfinance is required. Install with: pip install yfinance"
-        ) from exc
+        raise ImportError("yfinance is required. Install with: pip install yfinance") from exc
 
     logger.info(
         "Downloading %d tickers: %s (start=%s, end=%s, interval=%s)",
@@ -111,14 +126,11 @@ def fetch_prices(
         interval,
     )
 
-    data = yf.download(
-        tickers, start=start, end=end, interval=interval, progress=False
-    )
+    data = yf.download(tickers, start=start, end=end, interval=interval, progress=False)
 
     if data.empty:
         raise ValueError(
-            f"yfinance returned no data for tickers={tickers}, "
-            f"start={start}, end={end}."
+            f"yfinance returned no data for tickers={tickers}, start={start}, end={end}."
         )
 
     # Extract price column (handle API differences)
@@ -129,10 +141,7 @@ def fetch_prices(
         elif "Close" in levels:
             prices = data["Close"]
         else:
-            raise ValueError(
-                f"No 'Adj Close' or 'Close' in response. "
-                f"Available: {levels}"
-            )
+            raise ValueError(f"No 'Adj Close' or 'Close' in response. Available: {levels}")
     else:
         prices = data
 

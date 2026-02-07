@@ -16,7 +16,6 @@ from time_series_alpha_signal.cv import PurgedKFold, make_event_table
 from time_series_alpha_signal.data import load_synthetic_prices
 from time_series_alpha_signal.evaluation import cross_validate_sharpe
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -42,9 +41,7 @@ def event_table(synthetic_prices: pd.DataFrame) -> pd.DataFrame:
 class TestPurgedKFold:
     """Tests for the PurgedKFold splitter."""
 
-    def test_produces_correct_number_of_folds(
-        self, event_table: pd.DataFrame
-    ) -> None:
+    def test_produces_correct_number_of_folds(self, event_table: pd.DataFrame) -> None:
         cv = PurgedKFold(n_splits=5)
         folds = list(cv.split(event_table))
         assert len(folds) == 5
@@ -53,18 +50,14 @@ class TestPurgedKFold:
         cv = PurgedKFold(n_splits=3)
         assert cv.get_n_splits() == 3
 
-    def test_train_test_no_index_overlap(
-        self, event_table: pd.DataFrame
-    ) -> None:
+    def test_train_test_no_index_overlap(self, event_table: pd.DataFrame) -> None:
         """Train and test indices must not share any positions."""
         cv = PurgedKFold(n_splits=5)
         for train_idx, test_idx in cv.split(event_table):
             overlap = set(train_idx) & set(test_idx)
             assert len(overlap) == 0, f"Overlap found: {overlap}"
 
-    def test_all_indices_covered(
-        self, event_table: pd.DataFrame
-    ) -> None:
+    def test_all_indices_covered(self, event_table: pd.DataFrame) -> None:
         """Every index should appear in exactly one test fold."""
         cv = PurgedKFold(n_splits=5)
         all_test = []
@@ -72,9 +65,7 @@ class TestPurgedKFold:
             all_test.extend(test_idx)
         assert sorted(all_test) == list(range(len(event_table)))
 
-    def test_purging_removes_overlapping_events(
-        self, event_table: pd.DataFrame
-    ) -> None:
+    def test_purging_removes_overlapping_events(self, event_table: pd.DataFrame) -> None:
         """With purging, train sets should be smaller than without."""
         cv_no_purge = PurgedKFold(n_splits=3, embargo_pct=0.0)
         cv_with_embargo = PurgedKFold(n_splits=3, embargo_pct=0.05)
@@ -128,33 +119,23 @@ class TestMakeEventTable:
 class TestCrossValidateSharpe:
     """Tests for the cross_validate_sharpe evaluation function."""
 
-    def test_returns_list_of_floats(
-        self, synthetic_prices: pd.DataFrame
-    ) -> None:
-        sharpe_vals = cross_validate_sharpe(
-            synthetic_prices, n_splits=3
-        )
+    def test_returns_list_of_floats(self, synthetic_prices: pd.DataFrame) -> None:
+        sharpe_vals = cross_validate_sharpe(synthetic_prices, n_splits=3)
         assert isinstance(sharpe_vals, list)
         assert len(sharpe_vals) > 0
         for sr in sharpe_vals:
             assert isinstance(sr, float)
 
-    def test_fold_count_matches_n_splits(
-        self, synthetic_prices: pd.DataFrame
-    ) -> None:
+    def test_fold_count_matches_n_splits(self, synthetic_prices: pd.DataFrame) -> None:
         n_splits = 4
-        sharpe_vals = cross_validate_sharpe(
-            synthetic_prices, n_splits=n_splits
-        )
+        sharpe_vals = cross_validate_sharpe(synthetic_prices, n_splits=n_splits)
         assert len(sharpe_vals) == n_splits
 
     @pytest.mark.parametrize(
         "signal_type",
         ["momentum", "mean_reversion", "ewma_momentum"],
     )
-    def test_different_signals(
-        self, synthetic_prices: pd.DataFrame, signal_type: str
-    ) -> None:
+    def test_different_signals(self, synthetic_prices: pd.DataFrame, signal_type: str) -> None:
         sharpe_vals = cross_validate_sharpe(
             synthetic_prices,
             signal_type=signal_type,
@@ -171,16 +152,10 @@ class TestCrossValidateSharpe:
         assert isinstance(sharpe_vals, list)
         assert len(sharpe_vals) > 0
 
-    def test_with_cost_bps(
-        self, synthetic_prices: pd.DataFrame
-    ) -> None:
+    def test_with_cost_bps(self, synthetic_prices: pd.DataFrame) -> None:
         """Higher costs should generally produce lower Sharpe."""
-        sr_low_cost = cross_validate_sharpe(
-            synthetic_prices, n_splits=3, cost_bps=1.0
-        )
-        sr_high_cost = cross_validate_sharpe(
-            synthetic_prices, n_splits=3, cost_bps=50.0
-        )
+        sr_low_cost = cross_validate_sharpe(synthetic_prices, n_splits=3, cost_bps=1.0)
+        sr_high_cost = cross_validate_sharpe(synthetic_prices, n_splits=3, cost_bps=50.0)
         # Mean Sharpe with high costs should be <= low costs
         # (not strictly guaranteed on random data, so use a loose check)
         mean_low = np.mean(sr_low_cost)

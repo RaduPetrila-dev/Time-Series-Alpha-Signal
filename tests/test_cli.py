@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -37,8 +36,10 @@ class TestCLIRun:
         outdir = tmp_path / "results"
         res = run_cli(
             "run",
-            "--output", str(outdir),
-            "--days", "200",
+            "--output",
+            str(outdir),
+            "--days",
+            "200",
         )
         assert res.returncode == 0, f"CLI failed: {res.stderr}"
 
@@ -75,15 +76,16 @@ class TestCLIRun:
         "signal",
         ["momentum", "mean_reversion", "ewma_momentum", "ma_crossover"],
     )
-    def test_run_with_different_signals(
-        self, tmp_path: Path, signal: str
-    ) -> None:
+    def test_run_with_different_signals(self, tmp_path: Path, signal: str) -> None:
         outdir = tmp_path / f"results_{signal}"
         res = run_cli(
             "run",
-            "--signal", signal,
-            "--output", str(outdir),
-            "--days", "200",
+            "--signal",
+            signal,
+            "--output",
+            str(outdir),
+            "--days",
+            "200",
         )
         assert res.returncode == 0, f"{signal} failed: {res.stderr}"
 
@@ -103,9 +105,12 @@ class TestCLIFlags:
         outdir = tmp_path / "results"
         res = run_cli(
             "run",
-            "--output", str(outdir),
-            "--days", "200",
-            "--rebalance", "weekly",
+            "--output",
+            str(outdir),
+            "--days",
+            "200",
+            "--rebalance",
+            "weekly",
         )
         assert res.returncode == 0, f"CLI failed: {res.stderr}"
 
@@ -113,9 +118,12 @@ class TestCLIFlags:
         outdir = tmp_path / "results"
         res = run_cli(
             "run",
-            "--output", str(outdir),
-            "--days", "200",
-            "--impact-model", "sqrt",
+            "--output",
+            str(outdir),
+            "--days",
+            "200",
+            "--impact-model",
+            "sqrt",
         )
         assert res.returncode == 0, f"CLI failed: {res.stderr}"
 
@@ -123,8 +131,10 @@ class TestCLIFlags:
         outdir = tmp_path / "results"
         res = run_cli(
             "run",
-            "--output", str(outdir),
-            "--days", "200",
+            "--output",
+            str(outdir),
+            "--days",
+            "200",
             "-v",
         )
         assert res.returncode == 0, f"CLI failed: {res.stderr}"
@@ -143,16 +153,21 @@ class TestCLIErrors:
     def test_invalid_signal_fails(self, tmp_path: Path) -> None:
         res = run_cli(
             "run",
-            "--signal", "nonexistent_signal",
-            "--output", str(tmp_path),
-            "--days", "200",
+            "--signal",
+            "nonexistent_signal",
+            "--output",
+            str(tmp_path),
+            "--days",
+            "200",
         )
         assert res.returncode != 0
 
     def test_missing_csv_fails(self, tmp_path: Path) -> None:
         res = run_cli(
             "run",
-            "--csv", str(tmp_path / "does_not_exist.csv"),
-            "--output", str(tmp_path),
+            "--csv",
+            str(tmp_path / "does_not_exist.csv"),
+            "--output",
+            str(tmp_path),
         )
         assert res.returncode != 0

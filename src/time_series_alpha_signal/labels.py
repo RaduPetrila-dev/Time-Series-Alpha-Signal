@@ -126,9 +126,7 @@ def get_events(
         Rows with non-positive volatility are dropped.
     """
     if len(prices) != len(vol):
-        raise ValueError(
-            f"prices ({len(prices)}) and vol ({len(vol)}) length mismatch."
-        )
+        raise ValueError(f"prices ({len(prices)}) and vol ({len(vol)}) length mismatch.")
 
     vb = get_vertical_barriers(prices, horizon)
     vol_filled = vol.bfill().ffill()
@@ -146,9 +144,7 @@ def get_events(
     valid = vol_filled > 0
     n_dropped = (~valid).sum()
     if n_dropped > 0:
-        logger.debug(
-            "Dropped %d events with non-positive volatility.", n_dropped
-        )
+        logger.debug("Dropped %d events with non-positive volatility.", n_dropped)
     return df.loc[valid]
 
 # ---------------------------------------------------------------------------
@@ -235,9 +231,7 @@ def apply_triple_barrier(
     labels = np.empty(len(events), dtype=int)
 
     for i, (t0, row) in enumerate(events.iterrows()):
-        labels[i] = _label_single_event(
-            prices, t0, row["t1"], row["pt"], row["sl"]
-        )
+        labels[i] = _label_single_event(prices, t0, row["t1"], row["pt"], row["sl"])
 
     result = pd.DataFrame(
         {"t1": events["t1"].values, "y": labels},
@@ -299,9 +293,7 @@ def triple_barrier_labels(
     valid = events.index < events["t1"]
     n_dropped = (~valid).sum()
     if n_dropped > 0:
-        logger.debug(
-            "Dropped %d events at/beyond the vertical barrier.", n_dropped
-        )
+        logger.debug("Dropped %d events at/beyond the vertical barrier.", n_dropped)
     events = events.loc[valid]
 
     return apply_triple_barrier(prices, events)
@@ -338,9 +330,7 @@ def meta_label(
         If the indices do not match.
     """
     if not base_labels.index.equals(realized_returns.index):
-        raise ValueError(
-            "base_labels and realized_returns must share the same index."
-        )
+        raise ValueError("base_labels and realized_returns must share the same index.")
 
     lbl = base_labels.values
     ret_sign = np.sign(realized_returns.values)

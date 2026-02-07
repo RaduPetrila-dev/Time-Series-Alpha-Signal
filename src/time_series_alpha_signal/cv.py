@@ -251,17 +251,12 @@ class PurgedKFold:
         if n_splits < 2:
             raise ValueError(f"n_splits must be >= 2, got {n_splits}")
         if not (0.0 <= embargo_pct < 1.0):
-            raise ValueError(
-                f"embargo_pct must be in [0, 1), got {embargo_pct}"
-            )
+            raise ValueError(f"embargo_pct must be in [0, 1), got {embargo_pct}")
         self.n_splits = int(n_splits)
         self.embargo_pct = float(embargo_pct)
 
     def __repr__(self) -> str:
-        return (
-            f"PurgedKFold(n_splits={self.n_splits}, "
-            f"embargo_pct={self.embargo_pct})"
-        )
+        return f"PurgedKFold(n_splits={self.n_splits}, embargo_pct={self.embargo_pct})"
 
     def get_n_splits(self) -> int:
         """Return the number of folds."""
@@ -291,9 +286,7 @@ class PurgedKFold:
         folds = _compute_fold_boundaries(len(events), self.n_splits)
 
         for fold_idx, test_indices in enumerate(folds):
-            train_indices = _purge_train_indices(
-                events, test_indices, self.embargo_pct
-            )
+            train_indices = _purge_train_indices(events, test_indices, self.embargo_pct)
             logger.debug(
                 "Fold %d/%d: train=%d, test=%d",
                 fold_idx + 1,
@@ -368,13 +361,9 @@ def combinatorial_purged_cv(
         n_combos,
     )
 
-    for combo_idx, combo in enumerate(
-        itertools.combinations(range(n_splits), test_fold_size)
-    ):
+    for combo_idx, combo in enumerate(itertools.combinations(range(n_splits), test_fold_size)):
         test_indices = np.concatenate([folds[i] for i in combo])
-        train_indices = _purge_train_indices(
-            events, test_indices, embargo_pct
-        )
+        train_indices = _purge_train_indices(events, test_indices, embargo_pct)
         logger.debug(
             "CPCV combo %d/%d %s: train=%d, test=%d",
             combo_idx + 1,

@@ -229,15 +229,12 @@ def train_meta_model(
         from sklearn.preprocessing import StandardScaler
     except ImportError as exc:
         raise RuntimeError(
-            "scikit-learn is required for train_meta_model. "
-            "Install with: pip install scikit-learn"
+            "scikit-learn is required for train_meta_model. Install with: pip install scikit-learn"
         ) from exc
 
     # -- Labels ----------------------------------------------------------
     vol = daily_volatility(prices, span=vol_span)
-    events = triple_barrier_labels(
-        prices, vol=vol, pt_sl=pt_sl, horizon=horizon, vol_span=vol_span
-    )
+    events = triple_barrier_labels(prices, vol=vol, pt_sl=pt_sl, horizon=horizon, vol_span=vol_span)
 
     if events.empty:
         logger.warning("No valid events generated. Returning NaN metrics.")
@@ -264,8 +261,7 @@ def train_meta_model(
 
     if n_valid < n_splits * 2:
         logger.warning(
-            "Only %d valid samples (need >= %d for %d folds). "
-            "Returning NaN metrics.",
+            "Only %d valid samples (need >= %d for %d folds). Returning NaN metrics.",
             n_valid,
             n_splits * 2,
             n_splits,
@@ -295,10 +291,12 @@ def train_meta_model(
 
     # -- CV events table -------------------------------------------------
     filtered_index = meta_labels.index[mask]
-    cv_events = pd.DataFrame({
-        "t0": filtered_index,
-        "t1": events.loc[filtered_index, "t1"],
-    })
+    cv_events = pd.DataFrame(
+        {
+            "t0": filtered_index,
+            "t1": events.loc[filtered_index, "t1"],
+        }
+    )
 
     # -- Purged cross-validation -----------------------------------------
     cv = PurgedKFold(n_splits=n_splits, embargo_pct=embargo_pct)
@@ -310,9 +308,7 @@ def train_meta_model(
 
         # Skip degenerate folds (single class in training)
         if len(np.unique(y_train)) < 2:
-            logger.debug(
-                "Fold %d: single class in training set, skipping.", fold_idx
-            )
+            logger.debug("Fold %d: single class in training set, skipping.", fold_idx)
             continue
 
         # Standardise features (fit on train only)

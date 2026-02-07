@@ -126,8 +126,7 @@ def newey_west_tstat(
     # Guard against numerical issues
     if nw_var <= 0:
         logger.warning(
-            "Newey-West variance is non-positive (%.2e); "
-            "returning inf.",
+            "Newey-West variance is non-positive (%.2e); returning inf.",
             nw_var,
         )
         return float("inf")
@@ -199,9 +198,7 @@ def block_bootstrap_ci(
     for b in range(n_bootstrap):
         starts = rng.integers(0, n, size=n_blocks_needed)
         # Build resampled array using modular indexing
-        indices = np.concatenate(
-            [np.arange(s, s + block_size) % n for s in starts]
-        )[:n]
+        indices = np.concatenate([np.arange(s, s + block_size) % n for s in starts])[:n]
         sampled = pd.Series(arr[indices], index=r.index)
         metrics[b] = metric_func(sampled)
 
@@ -209,8 +206,7 @@ def block_bootstrap_ci(
     upper = float(np.percentile(metrics, 100 * (1 - alpha / 2)))
 
     logger.debug(
-        "Block bootstrap (n=%d, blocks=%d, B=%d): "
-        "%.1f%% CI = [%.4f, %.4f]",
+        "Block bootstrap (n=%d, blocks=%d, B=%d): %.1f%% CI = [%.4f, %.4f]",
         n,
         block_size,
         n_bootstrap,
@@ -302,11 +298,7 @@ def deflated_sharpe_ratio(
     kurt = float(sp_stats.kurtosis(r, bias=False, fisher=True))  # excess
 
     # Variance of the Sharpe ratio estimator (Lo, 2002)
-    var_sr = (
-        1
-        - skew * sr_per_period
-        + ((kurt) / 4) * sr_per_period**2
-    ) / (n - 1)
+    var_sr = (1 - skew * sr_per_period + ((kurt) / 4) * sr_per_period**2) / (n - 1)
 
     if var_sr <= 0:
         return 0.0
@@ -318,11 +310,13 @@ def deflated_sharpe_ratio(
     if n_trials <= 1:
         sr_star = 0.0
     else:
-        sr_star = se_sr * np.sqrt(periods) * (
-            (1 - euler_mascheroni)
-            * sp_stats.norm.ppf(1 - 1.0 / n_trials)
-            + euler_mascheroni
-            * sp_stats.norm.ppf(1 - 1.0 / n_trials * np.exp(-1))
+        sr_star = (
+            se_sr
+            * np.sqrt(periods)
+            * (
+                (1 - euler_mascheroni) * sp_stats.norm.ppf(1 - 1.0 / n_trials)
+                + euler_mascheroni * sp_stats.norm.ppf(1 - 1.0 / n_trials * np.exp(-1))
+            )
         )
 
     # PSR*: probability that observed SR exceeds the benchmark
