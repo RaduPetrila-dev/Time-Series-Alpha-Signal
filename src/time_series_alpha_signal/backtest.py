@@ -561,7 +561,7 @@ def backtest(
     max_gross: float = 1.0,
     cost_bps: float = 10.0,
     signal_type: str = "momentum",
-    arima_order: Tuple[int, int, int] = (1, 0, 1),
+    arima_order: tuple[int, int, int] = (1, 0, 1),
     max_leverage: float | None = None,
     max_drawdown: float | None = None,
     vol_window: int = 20,
