@@ -29,13 +29,15 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np
+import pandas as pd
 
 from time_series_alpha_signal.backtest import BacktestResult, backtest
 from time_series_alpha_signal.data import load_csv_prices, load_synthetic_prices
@@ -58,14 +60,12 @@ _SIGNAL_CHOICES = [
     "ma_crossover",
 ]
 
-
 # ---------------------------------------------------------------------------
 # Sweep logic
 # ---------------------------------------------------------------------------
 
-
 def run_sweep(
-    prices: "pd.DataFrame",
+    prices: pd.DataFrame,
     lookbacks: Sequence[int],
     grosses: Sequence[float],
     **kwargs: Any,
@@ -122,11 +122,9 @@ def run_sweep(
 
     return sharpes, details
 
-
 # ---------------------------------------------------------------------------
 # Visualisation
 # ---------------------------------------------------------------------------
-
 
 def plot_heatmap(
     matrix: np.ndarray,
@@ -196,11 +194,9 @@ def plot_heatmap(
     plt.close(fig)
     logger.info("Saved heatmap to %s/heatmap.png", out_path)
 
-
 # ---------------------------------------------------------------------------
 # CSV export
 # ---------------------------------------------------------------------------
-
 
 def write_csv(
     details: list[list[dict[str, Any]]],
@@ -239,11 +235,9 @@ def write_csv(
     df.to_csv(csv_path, index=False)
     logger.info("Saved metrics CSV to %s", csv_path)
 
-
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -407,7 +401,6 @@ def main() -> None:
     }
     print(json.dumps(summary, indent=2))
     logger.info("Best: lookback=%d, gross=%.2f, Sharpe=%.3f", best_lb, best_gross, best_sharpe)
-
 
 if __name__ == "__main__":
     main()
