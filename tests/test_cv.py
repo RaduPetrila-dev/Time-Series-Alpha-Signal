@@ -82,6 +82,7 @@ class TestPurgedKFold:
         for (train_np, _), (train_emb, _) in zip(
             cv_no_purge.split(event_table),
             cv_with_embargo.split(event_table),
+            strict=True,
         ):
             # Embargo should remove some training observations
             assert len(train_emb) <= len(train_np)
