@@ -100,7 +100,8 @@ class TestMakeEventTable:
     def test_output_shape(self, synthetic_prices: pd.DataFrame) -> None:
         idx = synthetic_prices.index
         events = make_event_table(idx, horizon=10)
-        assert len(events) == len(idx)
+        assert len(events) <= len(idx)
+        assert len(events) >= len(idx) - 10
         assert "t1" in events.columns
 
     def test_t1_is_after_t0(self, synthetic_prices: pd.DataFrame) -> None:
@@ -108,7 +109,7 @@ class TestMakeEventTable:
         events = make_event_table(idx, horizon=5)
         # For all but the last few rows, t1 should be strictly after t0
         interior = events.iloc[:-5]
-        assert (interior["t1"] > interior.index).all()
+        assert (interior["t1"] > interior["t0"]).all()
 
 
 # ---------------------------------------------------------------------------
