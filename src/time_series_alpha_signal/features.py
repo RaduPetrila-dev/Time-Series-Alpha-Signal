@@ -35,7 +35,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
