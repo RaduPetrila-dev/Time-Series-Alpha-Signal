@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import itertools
 import logging
-from typing import Iterator, Sequence
+from collections.abc import Iterator
 
 import numpy as np
 import pandas as pd
