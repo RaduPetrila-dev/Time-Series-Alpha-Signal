@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -27,11 +28,9 @@ from .evaluation import cross_validate_sharpe
 
 logger = logging.getLogger(__name__)
 
-
 # ---------------------------------------------------------------------------
 # Leverage constraint
 # ---------------------------------------------------------------------------
-
 
 def enforce_leverage(
     weights: pd.DataFrame,
@@ -67,11 +66,9 @@ def enforce_leverage(
     scale = np.minimum(max_leverage / gross.replace(0, np.inf), 1.0)
     return weights.mul(scale, axis=0)
 
-
 # ---------------------------------------------------------------------------
 # Optimisation result
 # ---------------------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class OptimizationResult:
@@ -111,11 +108,9 @@ class OptimizationResult:
             "final_metrics": self.final_metrics,
         }
 
-
 # ---------------------------------------------------------------------------
 # Generic parameter search
 # ---------------------------------------------------------------------------
-
 
 def optimize_parameter(
     prices: pd.DataFrame,
@@ -274,11 +269,9 @@ def optimize_parameter(
         final_metrics=final_metrics,
     )
 
-
 # ---------------------------------------------------------------------------
 # EWMA convenience wrapper
 # ---------------------------------------------------------------------------
-
 
 def optimize_ewma(
     prices: pd.DataFrame,
