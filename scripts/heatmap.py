@@ -28,8 +28,8 @@ import argparse
 import json
 import logging
 import sys
-from pathlib import Path
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 import matplotlib

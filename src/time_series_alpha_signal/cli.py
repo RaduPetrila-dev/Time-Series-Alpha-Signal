@@ -32,6 +32,7 @@ from typing import Any
 
 # Force non-interactive backend before any pyplot import.
 import matplotlib
+
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt  # noqa: E402
