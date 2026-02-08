@@ -125,7 +125,7 @@ def cross_validate_sharpe(
     sharpe_values: list[float] = []
     n_empty = 0
 
-    for fold_idx, (train_idx, test_idx) in enumerate(cv_iter):
+    for fold_idx, (_train_idx, test_idx) in enumerate(cv_iter):
         test_dates = events.iloc[test_idx]["t0"]
         fold_returns = daily_returns.reindex(test_dates).dropna()
 
