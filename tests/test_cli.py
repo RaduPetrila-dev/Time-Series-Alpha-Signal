@@ -130,12 +130,10 @@ class TestCLIFlags:
     def test_verbose_flag(self, tmp_path: Path) -> None:
         outdir = tmp_path / "results"
         res = run_cli(
-            "run",
-            "--output",
-            str(outdir),
-            "--days",
-            "200",
             "-v",
+            "run",
+            "--output", str(outdir),
+            "--days", "200",
         )
         assert res.returncode == 0, f"CLI failed: {res.stderr}"
         # Verbose mode should produce DEBUG output on stderr

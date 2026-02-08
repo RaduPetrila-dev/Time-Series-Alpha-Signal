@@ -23,9 +23,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from .backtest import BacktestResult, backtest
-from .evaluation import cross_validate_sharpe
-
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -173,6 +170,9 @@ def optimize_parameter(
     RuntimeError
         If no candidate produces a valid Sharpe ratio.
     """
+    from .backtest import BacktestResult, backtest
+    from .evaluation import cross_validate_sharpe
+
     prices = prices.sort_index()
     candidates_list = list(candidates)
 
@@ -309,6 +309,7 @@ def optimize_ewma(
     dict
         Keys: ``best_span``, ``results``, ``metrics``.
     """
+
     opt = optimize_parameter(
         prices=prices,
         signal_type="ewma_momentum",
