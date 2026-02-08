@@ -21,7 +21,8 @@ import logging
 import warnings
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import pandas as pd
