@@ -28,18 +28,15 @@ directional prediction was correct, enabling a secondary model to learn
 from __future__ import annotations
 
 import logging
-from typing import Tuple
 
 import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-
 # ---------------------------------------------------------------------------
 # Volatility estimation
 # ---------------------------------------------------------------------------
-
 
 def daily_volatility(
     prices: pd.Series,
@@ -63,11 +60,9 @@ def daily_volatility(
     vol = returns.ewm(span=span, adjust=False).std()
     return vol.bfill()
 
-
 # ---------------------------------------------------------------------------
 # Barrier construction
 # ---------------------------------------------------------------------------
-
 
 def get_vertical_barriers(
     prices: pd.Series,
@@ -100,11 +95,10 @@ def get_vertical_barriers(
     pos = np.clip(pos, 0, len(idx) - 1)
     return pd.Series(idx[pos], index=idx)
 
-
 def get_events(
     prices: pd.Series,
     vol: pd.Series,
-    pt_sl: Tuple[float, float] = (1.0, 1.0),
+    pt_sl: tuple[float, float] = (1.0, 1.0),
     horizon: int = 20,
 ) -> pd.DataFrame:
     """Construct the events table for the triple-barrier method.
@@ -157,11 +151,9 @@ def get_events(
         )
     return df.loc[valid]
 
-
 # ---------------------------------------------------------------------------
 # Triple-barrier labelling
 # ---------------------------------------------------------------------------
-
 
 def _label_single_event(
     prices: pd.Series,
@@ -211,7 +203,6 @@ def _label_single_event(
     # Vertical barrier: sign of return
     terminal_return = window.iloc[-1] - prices.loc[t0]
     return int(np.sign(terminal_return))
-
 
 def apply_triple_barrier(
     prices: pd.Series,
@@ -263,16 +254,14 @@ def apply_triple_barrier(
 
     return result
 
-
 # ---------------------------------------------------------------------------
 # Convenience wrapper
 # ---------------------------------------------------------------------------
 
-
 def triple_barrier_labels(
     prices: pd.Series,
     vol: pd.Series | None = None,
-    pt_sl: Tuple[float, float] = (1.0, 1.0),
+    pt_sl: tuple[float, float] = (1.0, 1.0),
     horizon: int = 20,
     vol_span: int = 100,
 ) -> pd.DataFrame:
@@ -317,11 +306,9 @@ def triple_barrier_labels(
 
     return apply_triple_barrier(prices, events)
 
-
 # ---------------------------------------------------------------------------
 # Meta-labels (vectorised)
 # ---------------------------------------------------------------------------
-
 
 def meta_label(
     base_labels: pd.Series,
