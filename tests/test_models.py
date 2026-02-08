@@ -13,13 +13,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from time_series_alpha_signal.labels import triple_barrier_labels
 from time_series_alpha_signal.models import (
     MetaModelResult,
     _compute_realized_returns,
     build_features,
     train_meta_model,
 )
-from time_series_alpha_signal.labels import triple_barrier_labels
 
 
 # ---------------------------------------------------------------------------
