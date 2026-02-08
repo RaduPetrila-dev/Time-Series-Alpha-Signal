@@ -24,7 +24,7 @@ References
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -32,11 +32,9 @@ from scipy import stats as sp_stats  # type: ignore
 
 logger = logging.getLogger(__name__)
 
-
 # ---------------------------------------------------------------------------
 # Annualised Sharpe ratio
 # ---------------------------------------------------------------------------
-
 
 def annualised_sharpe(
     returns: pd.Series,
@@ -71,11 +69,9 @@ def annualised_sharpe(
         return 0.0
     return float(np.sqrt(periods) * r.mean() / sigma)
 
-
 # ---------------------------------------------------------------------------
 # Newey-West t-statistic
 # ---------------------------------------------------------------------------
-
 
 def newey_west_tstat(
     returns: pd.Series,
@@ -139,11 +135,9 @@ def newey_west_tstat(
     se = np.sqrt(nw_var / n)
     return float(mean / se)
 
-
 # ---------------------------------------------------------------------------
 # Block bootstrap confidence intervals
 # ---------------------------------------------------------------------------
-
 
 def block_bootstrap_ci(
     metric_func: Callable[[pd.Series], float],
@@ -227,11 +221,9 @@ def block_bootstrap_ci(
 
     return lower, upper
 
-
 # ---------------------------------------------------------------------------
 # Deflated Sharpe Ratio (PSR*)
 # ---------------------------------------------------------------------------
-
 
 def deflated_sharpe_ratio(
     returns: pd.Series,
