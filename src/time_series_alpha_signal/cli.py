@@ -31,18 +31,17 @@ from pathlib import Path
 from typing import Any
 
 # Force non-interactive backend before any pyplot import.
-import matplotlib  # type: ignore
-
+import matplotlib
 matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
 
-import numpy as np
-import pandas as pd
-
-from .backtest import BacktestResult, backtest
-from .data import load_csv_prices, load_synthetic_prices, load_yfinance_prices
-from .evaluation import cross_validate_sharpe
-from .models import train_meta_model
+from .backtest import BacktestResult, backtest  # noqa: E402
+from .data import load_csv_prices, load_synthetic_prices, load_yfinance_prices  # noqa: E402
+from .evaluation import cross_validate_sharpe  # noqa: E402
+from .models import train_meta_model  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
