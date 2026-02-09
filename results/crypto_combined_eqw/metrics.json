@@ -22,5 +22,6 @@
   },
   "mode": "equal_weight",
   "rebalance": "daily",
-  "impact_model": "proportional"
+  "impact_model": "proportional",
+  "risk_config": null
 }
