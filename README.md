@@ -1,97 +1,193 @@
-Time‑Series Alpha Signals
-===================================
+Time-Series Alpha Signals
+=========================
 ![CI](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/ci.yml/badge.svg)
-
-<!-- CI badge -->
 [![Real Data Backtests](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/real_data_backtests.yml/badge.svg?branch=main)](https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal/actions/workflows/real_data_backtests.yml)
 
-This project implements a small research framework for building and
-evaluating cross‑sectional time‑series trading signals.  It expands on
-the original momentum prototype with:
+A Python research framework for building, backtesting, and evaluating
+cross-sectional time-series trading signals. Implements methodologies
+from Lopez de Prado's *Advances in Financial Machine Learning* (2018)
+including triple-barrier labelling, purged k-fold cross-validation,
+fractional differentiation, and the deflated Sharpe ratio.
 
-- **Purged k‑fold cross‑validation** with optional embargo to avoid
-  look‑ahead bias.  A combinatorial variant (CPCV) is also provided to
-  assess parameter stability.
-- **Event‑based labelling** via the *triple‑barrier* method with
-  volatility‑scaled profit‑taking, stop‑loss and vertical timeouts.  Meta‑labels
-  indicate when a base classifier is directionally correct.
-- **Fractional differentiation** to stationarise non‑stationary price
-  series while preserving memory.
-- **Statistical metrics** including Newey–West t‑statistics,
-  block bootstrap confidence intervals and a simple deflated Sharpe ratio.
-- **Evaluation helpers** to produce a distribution of Sharpe ratios
-  across cross‑validation folds and summarise performance (CAGR,
-  volatility, drawdown, Calmar, hit‑rate, average win/loss, turnover).
+> Educational project -- not investment advice.
 
-The package is fully vectorised, uses pandas for time series
-manipulation and includes a command‑line interface for running
-single backtests on synthetic or real data.  Advanced model
-selection and portfolio construction are left to the user.
+Features
+--------
 
-> Educational project — not investment advice.
+**Signals** -- 8 cross-sectional signals registered via a pluggable signal registry:
+momentum, mean-reversion, EWMA momentum, moving average crossover,
+volatility (low-vol tilt), volatility-scaled momentum, regime switch,
+and ARIMA forecasts.
+
+**Backtesting** -- production-grade backtest engine with:
+- Rebalance frequency control (daily, weekly, monthly).
+- Two transaction cost models: proportional (flat bps) and square-root (market impact).
+- Drawdown stop mechanism that halts trading after a threshold breach.
+- Leverage enforcement via L1-norm scaling.
+- Structured `BacktestResult` output with equity curve, weights, and 10+ metrics.
+
+**Cross-validation** -- purged k-fold CV with configurable embargo to prevent
+lookahead bias. Combinatorial purged CV (CPCV) for parameter stability analysis.
+
+**Labelling** -- triple-barrier method with volatility-scaled profit-taking
+and stop-loss barriers. First-hit-time priority when both barriers are
+breached. Meta-labels for bet sizing.
+
+**Meta-labelling model** -- sklearn LogisticRegression with StandardScaler
+and L2 regularisation. Three features (momentum, volatility, mean-reversion
+z-score). Structured `MetaModelResult` with per-fold accuracy and class balance.
+
+**Statistical metrics** -- annualised Sharpe (ddof=1), Newey-West HAC
+t-statistic, block bootstrap confidence intervals with reproducible seeding,
+and the probabilistic Sharpe ratio (PSR*) from Bailey & Lopez de Prado (2014)
+adjusted for skewness, kurtosis, and multiple testing.
+
+**Fractional differentiation** -- stationarise price series while preserving
+memory using the fixed-width window method. Cached weight computation and
+automatic minimum-d selection via ADF testing.
+
+**Parameter optimisation** -- generic grid search over any signal parameter
+using out-of-sample Sharpe from purged CV. Includes EWMA span convenience wrapper.
+
+**Testing** -- 42 automated tests covering backtest mechanics, CV split
+correctness, no-lookahead verification, meta-model training, CLI integration,
+and error paths. CI runs lint (ruff), type checking (mypy), and tests across
+Python 3.10, 3.11, and 3.12.
 
 Quickstart
 ----------
 
 ```bash
-# Clone & enter
+# Clone and install
 git clone https://github.com/RaduPetrila-dev/Time-Series-Alpha-Signal.git
 cd Time-Series-Alpha-Signal
-
-# Create a virtual environment and install dependencies
 python -m venv .venv && source .venv/bin/activate
+
+# Core install
 pip install -e .
 
-# Run a backtest on synthetic data (momentum signal)
-python -m time_series_alpha_signal.cli run --signal momentum --names 10 --days 500 --output tmpdir
+# With dev tools (pytest, ruff, mypy)
+pip install -e ".[dev]"
 
-# Compute cross‑validated Sharpe distribution (example using default settings)
-python -c "import pandas as pd; from time_series_alpha_signal import load_synthetic_prices, cross_validate_sharpe; prices = load_synthetic_prices(10, 500); s = cross_validate_sharpe(prices); print(s)"
+# With ARIMA signal support
+pip install -e ".[dev,arima]"
+```
 
-# Apply triple‑barrier labels to a single asset
-python -c "import pandas as pd; from time_series_alpha_signal import load_synthetic_prices, daily_volatility, triple_barrier_labels; p = load_synthetic_prices(1, 300)['SYM000']; vol = daily_volatility(p); lbl = triple_barrier_labels(p, vol); print(lbl.head())"
+Run a backtest on synthetic data:
+
+```bash
+python -m time_series_alpha_signal.cli run \
+  --signal momentum --names 10 --days 500 \
+  --rebalance daily --cost-bps 10 \
+  --output results/momentum
+```
+
+Run cross-validated Sharpe estimation:
+
+```bash
+python -m time_series_alpha_signal.cli cv \
+  --signal ewma_momentum --ewma-span 30 \
+  --names 10 --days 500 --n-splits 5 \
+  --output results/cv
+```
+
+Train a meta-labelling model:
+
+```bash
+python -m time_series_alpha_signal.cli train \
+  --names 5 --days 400 --lookback 10 \
+  --vol-span 50 --n-splits 3 \
+  --output results/train
+```
+
+Fetch real data and run a backtest:
+
+```bash
+python scripts/fetch_data.py --universe faang --start 2018-01-01 --end 2023-12-31
+python -m time_series_alpha_signal.cli run \
+  --csv data/prices_faang_20180101_20231231.csv \
+  --signal ewma_momentum --ewma-span 30 \
+  --rebalance weekly --impact-model sqrt \
+  --output results/faang
+```
+
+Generate a parameter sweep heatmap:
+
+```bash
+python scripts/heatmap.py \
+  --signal momentum \
+  --lookbacks 5 10 20 40 60 \
+  --grosses 0.5 1.0 1.5 2.0 \
+  --output results/sweep
+```
+
+Generate benchmark equity curves:
+
+```bash
+python scripts/benchmark_eqw.py --csv data/prices_faang_20180101_20231231.csv --type eqw
+python scripts/benchmark_eqw.py --csv data/prices_faang_20180101_20231231.csv --type ivol
+```
+
+Available Signals
+-----------------
+
+| Signal | Function | Key parameter |
+|--------|----------|---------------|
+| Momentum | `momentum_signal` | `lookback` |
+| Mean reversion | `mean_reversion_signal` | `lookback` |
+| EWMA momentum | `ewma_momentum_signal` | `span` |
+| MA crossover | `moving_average_crossover_signal` | `ma_short`, `ma_long` |
+| Volatility | `volatility_signal` | `lookback` |
+| Vol-scaled momentum | `volatility_scaled_momentum_signal` | `lookback`, `vol_window` |
+| Regime switch | `regime_switch_signal` | `lookback`, `vol_threshold` |
+| ARIMA | `arima_signal` | `order` |
+
+Custom signals can be registered at runtime:
+
+```python
+from time_series_alpha_signal.backtest import register_signal
+
+def my_signal(prices, lookback=10):
+    return prices.pct_change(lookback).shift(1)
+
+register_signal("my_signal", my_signal)
 ```
 
 Directory Structure
 -------------------
 
-- **src/time_series_alpha_signal/backtest.py** – core backtesting logic
-- **src/time_series_alpha_signal/signals.py** – various cross‑sectional signals
-- **src/time_series_alpha_signal/cv.py** – purged k‑fold and CPCV splitters
-- **src/time_series_alpha_signal/labels.py** – triple‑barrier labelling and meta‑labels
-- **src/time_series_alpha_signal/features.py** – fractional differentiation helpers
-- **src/time_series_alpha_signal/metrics.py** – Sharpe, Newey–West, bootstrap and deflated Sharpe
-- **src/time_series_alpha_signal/evaluation.py** – cross‑validation evaluation and performance summary
-- **src/time_series_alpha_signal/optimizer.py** – leverage constraint helper
-- **src/time_series_alpha_signal/cli.py** – basic CLI for running single backtests
-- **scripts/run.py** – thin wrapper around the CLI for convenience
+```
+src/time_series_alpha_signal/
+    backtest.py      Signal registry, portfolio construction, simulation engine
+    signals.py       8 cross-sectional signal functions
+    cv.py            Purged k-fold and combinatorial purged CV splitters
+    labels.py        Triple-barrier labelling and meta-labels
+    features.py      Fractional differentiation (fracdiff)
+    metrics.py       Sharpe, Newey-West, bootstrap CI, deflated Sharpe (PSR*)
+    evaluation.py    CV evaluation and fold-level performance summary
+    models.py        Meta-labelling model (LogisticRegression + purged CV)
+    optimizer.py     Leverage enforcement and generic parameter optimisation
+    data.py          Data loaders (synthetic, CSV, Yahoo Finance)
+    cli.py           Command-line interface (run, cv, train subcommands)
 
-CLI Extensions
---------------
+scripts/
+    fetch_data.py       Download prices from Yahoo Finance
+    benchmark_eqw.py    Benchmark equity curves (equal-weight, buy-and-hold, inverse-vol)
+    heatmap.py          Parameter sweep with Sharpe ratio heatmap
+    run.py              Thin CLI wrapper
 
-The CLI now supports additional subcommands beyond ``run``:
+tests/
+    test_cli.py      CLI integration tests (11 tests)
+    test_cv.py        Purged CV and cross_validate_sharpe tests (14 tests)
+    test_models.py    Meta-model, features, and realised returns tests (14 tests)
+```
 
-* ``cv`` – Estimate an out‑of‑sample Sharpe ratio distribution using purged
-  k‑fold (or combinatorial) cross‑validation.  The command accepts
-  the same signal parameters as ``run`` and writes a JSON report
-  containing the individual fold Sharpe ratios and their summary statistics.
+References
+----------
 
-  ```bash
-  # example CV on synthetic data
-  python -m time_series_alpha_signal.cli cv --signal momentum \
-    --names 10 --days 500 --n-splits 5 --output cv_results
-  ```
-
-* ``train`` – Train a simple logistic regression meta‑model on each asset
-  using triple‑barrier labels.  The model predicts when the base
-  classifier is likely to be correct (meta‑labelling) and reports
-  cross‑validated classification accuracy per asset.  A JSON summary
-  is saved to the output directory.
-
-  ```bash
-  # example meta‑label training on synthetic data
-  python -m time_series_alpha_signal.cli train --names 5 --days 400 \
-    --lookback 10 --vol-span 50 --n-splits 3 --output train_results
-  ```
-
-
+- Lopez de Prado, M. (2018). *Advances in Financial Machine Learning*. Wiley.
+- Bailey, D. H. and Lopez de Prado, M. (2014). "The Deflated Sharpe Ratio."
+  *Journal of Portfolio Management*, 40(5), 94-107.
+- Newey, W. K. and West, K. D. (1987). "A Simple, Positive Semi-definite,
+  Heteroskedasticity and Autocorrelation Consistent Covariance Matrix."
+  *Econometrica*, 55(3), 703-708.
