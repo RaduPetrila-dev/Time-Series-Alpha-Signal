@@ -41,6 +41,7 @@ from time_series_alpha_signal.combiner import (  # noqa: E402
     walk_forward_optimize,
 )
 from time_series_alpha_signal.data import load_csv_prices, load_yfinance_prices  # noqa: E402
+from time_series_alpha_signal.risk_model import RiskConfig  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,27 @@ def main() -> None:
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("-v", "--verbose", action="store_true")
 
+    # Risk model arguments
+    parser.add_argument(
+        "--risk-model",
+        dest="risk_model",
+        action="store_true",
+        default=False,
+        help="Enable the risk model pipeline.",
+    )
+    parser.add_argument("--clip-zscore", dest="clip_zscore", type=float, default=2.0)
+    parser.add_argument("--smooth-halflife", dest="smooth_halflife", type=int, default=5)
+    parser.add_argument(
+        "--no-inverse-vol",
+        dest="inverse_vol",
+        action="store_false",
+        default=True,
+    )
+    parser.add_argument("--vol-lookback", dest="vol_lookback", type=int, default=20)
+    parser.add_argument("--vol-target", dest="vol_target", type=float, default=0.15)
+    parser.add_argument("--vol-target-lookback", dest="vol_target_lookback", type=int, default=63)
+    parser.add_argument("--max-leverage", dest="max_leverage", type=float, default=2.0)
+
     args = parser.parse_args()
 
     level = logging.DEBUG if args.verbose else logging.INFO
@@ -159,6 +181,20 @@ def main() -> None:
         level=level,
         stream=sys.stderr,
     )
+
+    # Build risk config
+    risk_config = None
+    if args.risk_model:
+        risk_config = RiskConfig(
+            clip_zscore=args.clip_zscore,
+            smooth_halflife=args.smooth_halflife,
+            inverse_vol=args.inverse_vol,
+            vol_lookback=args.vol_lookback,
+            vol_target=args.vol_target,
+            vol_target_lookback=args.vol_target_lookback,
+            max_leverage=args.max_leverage,
+        )
+        logger.info("Risk model enabled: %s", risk_config.to_dict())
 
     # Load prices
     if args.csv:
@@ -189,6 +225,7 @@ def main() -> None:
             max_gross=args.max_gross,
             cost_bps=args.cost_bps,
             impact_model=args.impact_model,
+            risk_config=risk_config,
             **signal_kwargs,
         )
 
@@ -219,6 +256,7 @@ def main() -> None:
             max_gross=args.max_gross,
             cost_bps=args.cost_bps,
             impact_model=args.impact_model,
+            risk_config=risk_config,
             **signal_kwargs,
         )
 

@@ -25,9 +25,9 @@ jobs:
           pip install -e ".[dev,arima]"
           pip install --upgrade yfinance
 
-      # ---- FAANG basket ----
+      # ---- FAANG basket (baseline) ----
 
-      - name: FAANG equal-weight blend
+      - name: FAANG equal-weight baseline
         run: |
           python scripts/run_combined.py \
             --tickers AAPL,AMZN,GOOGL,META,NFLX \
@@ -39,7 +39,24 @@ jobs:
             --output results/faang_combined_eqw \
             -v 2>&1
 
-      - name: FAANG walk-forward optimised
+      # ---- FAANG basket (risk model) ----
+
+      - name: FAANG equal-weight with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers AAPL,AMZN,GOOGL,META,NFLX \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum \
+            --mode equal_weight \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 10 --max-gross 1.0 \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 5 \
+            --vol-target 0.10 --max-leverage 2.0 \
+            --output results/faang_combined_eqw_risk \
+            -v 2>&1
+
+      - name: FAANG walk-forward with risk model
         run: |
           python scripts/run_combined.py \
             --tickers AAPL,AMZN,GOOGL,META,NFLX \
@@ -50,12 +67,15 @@ jobs:
             --weight-step 0.25 \
             --lookback 20 --ewma-span 30 \
             --cost-bps 10 --max-gross 1.0 \
-            --output results/faang_combined_wf \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 5 \
+            --vol-target 0.10 --max-leverage 2.0 \
+            --output results/faang_combined_wf_risk \
             -v 2>&1
 
-      # ---- Crypto basket ----
+      # ---- Crypto basket (baseline) ----
 
-      - name: Crypto equal-weight blend
+      - name: Crypto equal-weight baseline
         run: |
           python scripts/run_combined.py \
             --tickers BTC-USD,ETH-USD \
@@ -67,7 +87,24 @@ jobs:
             --output results/crypto_combined_eqw \
             -v 2>&1
 
-      - name: Crypto walk-forward optimised
+      # ---- Crypto basket (risk model) ----
+
+      - name: Crypto equal-weight with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers BTC-USD,ETH-USD \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum \
+            --mode equal_weight \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 20 --max-gross 1.0 \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 5 \
+            --vol-target 0.15 --max-leverage 2.0 \
+            --output results/crypto_combined_eqw_risk \
+            -v 2>&1
+
+      - name: Crypto walk-forward with risk model
         run: |
           python scripts/run_combined.py \
             --tickers BTC-USD,ETH-USD \
@@ -78,7 +115,10 @@ jobs:
             --weight-step 0.25 \
             --lookback 20 --ewma-span 30 \
             --cost-bps 20 --max-gross 1.0 \
-            --output results/crypto_combined_wf \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 5 \
+            --vol-target 0.15 --max-leverage 2.0 \
+            --output results/crypto_combined_wf_risk \
             -v 2>&1
 
       # ---- Summary ----
@@ -94,7 +134,6 @@ jobs:
               d = json.loads(m.read_text())
               name = str(m.parent.relative_to(root))
 
-              # Handle both flat metrics and nested overall_metrics
               metrics = d.get("overall_metrics", d)
               sharpe_key = "oos_sharpe" if "oos_sharpe" in metrics else "sharpe"
               cagr_key = "oos_cagr" if "oos_cagr" in metrics else "cagr"

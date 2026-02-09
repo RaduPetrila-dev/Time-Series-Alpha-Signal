@@ -28,6 +28,7 @@ from .metrics import (  # noqa: F401
 )
 from .models import train_meta_model  # noqa: F401
 from .optimizer import enforce_leverage, optimize_ewma  # noqa: F401
+from .risk_model import RiskConfig, apply_risk_model  # noqa: F401
 
 __all__ = [
     "annualised_sharpe",
@@ -52,6 +53,8 @@ __all__ = [
     "optimize_ewma",
     "pick_min_d",
     "PurgedKFold",
+    "RiskConfig",
+    "apply_risk_model",
     "signals",
     "summarize_fold_metrics",
     "train_meta_model",

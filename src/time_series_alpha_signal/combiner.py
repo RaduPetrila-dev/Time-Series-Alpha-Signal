@@ -26,6 +26,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from .risk_model import RiskConfig, apply_risk_model
+
 logger = logging.getLogger(__name__)
 
 
@@ -167,13 +169,14 @@ def blend_equal_weight(
     cost_bps: float = 10.0,
     rebalance: str = "daily",
     impact_model: str = "proportional",
+    risk_config: RiskConfig | None = None,
     **signal_kwargs,
 ) -> CombinedResult:
     """Run a backtest using an equal-weight blend of multiple signals.
 
     Each signal is z-scored cross-sectionally, then the signals are
     averaged to produce a single combined score. The combined score
-    is passed to the backtest engine for portfolio construction.
+    is passed through the risk model pipeline for portfolio construction.
 
     Parameters
     ----------
@@ -189,6 +192,9 @@ def blend_equal_weight(
         Rebalance frequency.
     impact_model : str
         Cost model type.
+    risk_config : RiskConfig or None
+        Risk model configuration. Pass ``RiskConfig()`` for defaults
+        or ``NO_RISK`` to disable all transforms.
     **signal_kwargs
         Passed to ``compute_signals``.
 
@@ -206,9 +212,12 @@ def blend_equal_weight(
         combined = combined + df
     combined = combined / len(dfs)
 
-    # Build weights from combined signal (same logic as backtest engine)
-    row_abs_sum = combined.abs().sum(axis=1).replace(0, np.nan)
-    weights = combined.div(row_abs_sum, axis=0).fillna(0.0) * max_gross
+    # Build weights via risk model or simple normalisation
+    if risk_config is not None:
+        weights = apply_risk_model(combined, prices, config=risk_config, max_gross=max_gross)
+    else:
+        row_abs_sum = combined.abs().sum(axis=1).replace(0, np.nan)
+        weights = combined.div(row_abs_sum, axis=0).fillna(0.0) * max_gross
 
     # Run backtest with precomputed weights
     returns = prices.pct_change()
@@ -260,6 +269,7 @@ def blend_equal_weight(
         "mode": "equal_weight",
         "rebalance": rebalance,
         "impact_model": impact_model,
+        "risk_config": risk_config.to_dict() if risk_config is not None else None,
     }
 
     return CombinedResult(
@@ -297,6 +307,7 @@ def _backtest_with_signal_weights(
     max_gross: float = 1.0,
     cost_bps: float = 10.0,
     impact_model: str = "proportional",
+    risk_config: RiskConfig | None = None,
 ) -> pd.Series:
     """Run a quick backtest using pre-computed signals and weights.
 
@@ -306,8 +317,12 @@ def _backtest_with_signal_weights(
     combined: pd.DataFrame = active[0][1] * signals[active[0][0]]
     for name, w in active[1:]:
         combined = combined + w * signals[name]
-    row_abs = combined.abs().sum(axis=1).replace(0, np.nan)
-    port_weights = combined.div(row_abs, axis=0).fillna(0.0) * max_gross
+
+    if risk_config is not None:
+        port_weights = apply_risk_model(combined, prices, config=risk_config, max_gross=max_gross)
+    else:
+        row_abs = combined.abs().sum(axis=1).replace(0, np.nan)
+        port_weights = combined.div(row_abs, axis=0).fillna(0.0) * max_gross
 
     returns = prices.pct_change()
     port_ret = (port_weights.shift(1) * returns).sum(axis=1).dropna()
@@ -332,6 +347,7 @@ def walk_forward_optimize(
     max_gross: float = 1.0,
     cost_bps: float = 10.0,
     impact_model: str = "proportional",
+    risk_config: RiskConfig | None = None,
     **signal_kwargs,
 ) -> WalkForwardResult:
     """Walk-forward optimisation of signal blend weights.
@@ -420,6 +436,7 @@ def walk_forward_optimize(
                     max_gross=max_gross,
                     cost_bps=cost_bps,
                     impact_model=impact_model,
+                    risk_config=risk_config,
                 )
                 if len(ret) < 20 or ret.std() == 0:
                     continue
@@ -442,6 +459,7 @@ def walk_forward_optimize(
             max_gross=max_gross,
             cost_bps=cost_bps,
             impact_model=impact_model,
+            risk_config=risk_config,
         )
         oos_returns_list.append(oos_ret)
 
