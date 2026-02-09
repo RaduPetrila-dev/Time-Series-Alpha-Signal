@@ -1,0 +1,122 @@
+{
+  "overall_metrics": {
+    "oos_days": 1513,
+    "oos_cagr": 0.016793085588198142,
+    "oos_ann_vol": 0.24922636694606873,
+    "oos_sharpe": 0.19018134994087443,
+    "oos_max_dd": -0.4219089655660535,
+    "oos_calmar": 0.03980262795711801,
+    "n_windows": 6,
+    "signals": [
+      "momentum",
+      "mean_reversion",
+      "ewma_momentum",
+      "volatility"
+    ],
+    "mode": "walk_forward",
+    "train_days": 504,
+    "test_days": 252,
+    "step_days": 252,
+    "max_gross": 1.0,
+    "cost_bps": 20.0,
+    "impact_model": "proportional"
+  },
+  "window_results": [
+    {
+      "window": 0,
+      "train_start": "2018-01-01",
+      "train_end": "2019-05-19",
+      "test_start": "2019-05-20",
+      "test_end": "2020-01-26",
+      "best_weights": {
+        "momentum": 0.5,
+        "mean_reversion": 0.0,
+        "ewma_momentum": 0.25,
+        "volatility": 0.25
+      },
+      "train_sharpe": 2.059642090693502,
+      "oos_sharpe": 1.3437684862886041,
+      "oos_days": 253
+    },
+    {
+      "window": 1,
+      "train_start": "2018-09-10",
+      "train_end": "2020-01-26",
+      "test_start": "2020-01-27",
+      "test_end": "2020-10-04",
+      "best_weights": {
+        "momentum": 0.5,
+        "mean_reversion": 0.0,
+        "ewma_momentum": 0.25,
+        "volatility": 0.25
+      },
+      "train_sharpe": 0.8696813920097308,
+      "oos_sharpe": 0.2916480268625986,
+      "oos_days": 253
+    },
+    {
+      "window": 2,
+      "train_start": "2019-05-20",
+      "train_end": "2020-10-04",
+      "test_start": "2020-10-05",
+      "test_end": "2021-06-13",
+      "best_weights": {
+        "momentum": 0.25,
+        "mean_reversion": 0.0,
+        "ewma_momentum": 0.75,
+        "volatility": 0.0
+      },
+      "train_sharpe": 0.9420629968749823,
+      "oos_sharpe": 0.9562192758177264,
+      "oos_days": 253
+    },
+    {
+      "window": 3,
+      "train_start": "2020-01-27",
+      "train_end": "2021-06-13",
+      "test_start": "2021-06-14",
+      "test_end": "2022-02-20",
+      "best_weights": {
+        "momentum": 0.75,
+        "mean_reversion": 0.0,
+        "ewma_momentum": 0.25,
+        "volatility": 0.0
+      },
+      "train_sharpe": 0.8353721812898552,
+      "oos_sharpe": -1.4055251644230786,
+      "oos_days": 253
+    },
+    {
+      "window": 4,
+      "train_start": "2020-10-05",
+      "train_end": "2022-02-20",
+      "test_start": "2022-02-21",
+      "test_end": "2022-10-30",
+      "best_weights": {
+        "momentum": 0.25,
+        "mean_reversion": 0.0,
+        "ewma_momentum": 0.75,
+        "volatility": 0.0
+      },
+      "train_sharpe": 0.1608872696743609,
+      "oos_sharpe": -0.29267764236960103,
+      "oos_days": 253
+    },
+    {
+      "window": 5,
+      "train_start": "2021-06-14",
+      "train_end": "2022-10-30",
+      "test_start": "2022-10-31",
+      "test_end": "2023-07-09",
+      "best_weights": {
+        "momentum": 0.25,
+        "mean_reversion": 0.0,
+        "ewma_momentum": 0.25,
+        "volatility": 0.5
+      },
+      "train_sharpe": -0.12376811081687679,
+      "oos_sharpe": -0.09162344711561697,
+      "oos_days": 253
+    }
+  ]
+}
