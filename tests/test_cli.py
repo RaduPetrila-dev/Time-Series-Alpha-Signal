@@ -132,8 +132,10 @@ class TestCLIFlags:
         res = run_cli(
             "-v",
             "run",
-            "--output", str(outdir),
-            "--days", "200",
+            "--output",
+            str(outdir),
+            "--days",
+            "200",
         )
         assert res.returncode == 0, f"CLI failed: {res.stderr}"
         # Verbose mode should produce DEBUG output on stderr

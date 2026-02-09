@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 # Annualised Sharpe ratio
 # ---------------------------------------------------------------------------
 
+
 def annualised_sharpe(
     returns: pd.Series,
     periods: int = 252,
@@ -69,9 +70,11 @@ def annualised_sharpe(
         return 0.0
     return float(np.sqrt(periods) * r.mean() / sigma)
 
+
 # ---------------------------------------------------------------------------
 # Newey-West t-statistic
 # ---------------------------------------------------------------------------
+
 
 def newey_west_tstat(
     returns: pd.Series,
@@ -134,9 +137,11 @@ def newey_west_tstat(
     se = np.sqrt(nw_var / n)
     return float(mean / se)
 
+
 # ---------------------------------------------------------------------------
 # Block bootstrap confidence intervals
 # ---------------------------------------------------------------------------
+
 
 def block_bootstrap_ci(
     metric_func: Callable[[pd.Series], float],
@@ -217,9 +222,11 @@ def block_bootstrap_ci(
 
     return lower, upper
 
+
 # ---------------------------------------------------------------------------
 # Deflated Sharpe Ratio (PSR*)
 # ---------------------------------------------------------------------------
+
 
 def deflated_sharpe_ratio(
     returns: pd.Series,

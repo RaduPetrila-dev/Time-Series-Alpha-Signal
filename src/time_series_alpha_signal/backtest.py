@@ -144,9 +144,7 @@ def _register_builtin_signals() -> None:
     register_signal("mean_reversion", signals.mean_reversion_signal)
     register_signal("arima", signals.arima_signal)
     register_signal("volatility", signals.volatility_signal)
-    register_signal(
-        "vol_scaled_momentum", signals.volatility_scaled_momentum_signal
-    )
+    register_signal("vol_scaled_momentum", signals.volatility_scaled_momentum_signal)
     register_signal("regime_switch", signals.regime_switch_signal)
     register_signal("ewma_momentum", signals.ewma_momentum_signal)
     register_signal("ma_crossover", signals.moving_average_crossover_signal)
@@ -184,10 +182,7 @@ def compute_signal(
     """
     if signal_type not in _SIGNAL_REGISTRY:
         available = ", ".join(sorted(_SIGNAL_REGISTRY))
-        raise ValueError(
-            f"Unknown signal_type '{signal_type}'. "
-            f"Available signals: {available}"
-        )
+        raise ValueError(f"Unknown signal_type '{signal_type}'. Available signals: {available}")
     logger.debug("Computing signal: %s with kwargs %s", signal_type, kwargs)
     return _SIGNAL_REGISTRY[signal_type](prices, **kwargs)
 
@@ -364,10 +359,7 @@ def simulate(
     elif impact_model == "sqrt":
         cost = _sqrt_impact_cost(turnover, cost_bps)
     else:
-        raise ValueError(
-            f"Unknown impact_model '{impact_model}'. "
-            "Choose 'proportional' or 'sqrt'."
-        )
+        raise ValueError(f"Unknown impact_model '{impact_model}'. Choose 'proportional' or 'sqrt'.")
 
     net = gross - cost
     return net
@@ -529,10 +521,7 @@ def _validate_prices(prices: pd.DataFrame) -> pd.DataFrame:
         If *prices* is empty or has fewer than 2 rows.
     """
     if prices.empty or len(prices) < 2:
-        raise ValueError(
-            "Price DataFrame must contain at least 2 rows; "
-            f"got {len(prices)}."
-        )
+        raise ValueError(f"Price DataFrame must contain at least 2 rows; got {len(prices)}.")
 
     prices = prices.sort_index()
 

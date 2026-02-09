@@ -245,11 +245,7 @@ def _save_plots(result: BacktestResult, out_dir: Path) -> None:
     plt.close(fig)
 
     # Rolling Sharpe (63-day, ~1 quarter)
-    rolling_sharpe = (
-        result.daily.rolling(63).mean()
-        / result.daily.rolling(63).std()
-        * np.sqrt(252)
-    )
+    rolling_sharpe = result.daily.rolling(63).mean() / result.daily.rolling(63).std() * np.sqrt(252)
     fig, ax = plt.subplots(figsize=(10, 4))
     rolling_sharpe.plot(ax=ax, title="Rolling 63-day Sharpe Ratio")
     ax.axhline(0, color="grey", linewidth=0.8, linestyle="--")
@@ -272,8 +268,18 @@ def _save_plots(result: BacktestResult, out_dir: Path) -> None:
         )
         heatmap_data = pivot.pivot(index="year", columns="month", values="return")
         heatmap_data.columns = [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+            "Jan",
+            "Feb",
+            "Mar",
+            "Apr",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dec",
         ][: len(heatmap_data.columns)]
 
         fig, ax = plt.subplots(figsize=(12, max(3, len(heatmap_data) * 0.6)))
@@ -333,9 +339,7 @@ def cmd_run(args: argparse.Namespace) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Write metrics
-    (out_dir / "metrics.json").write_text(
-        json.dumps(result.metrics, indent=2)
-    )
+    (out_dir / "metrics.json").write_text(json.dumps(result.metrics, indent=2))
 
     # Write daily returns and weights for reproducibility
     result.daily.to_csv(out_dir / "daily_returns.csv", header=True)
@@ -437,9 +441,7 @@ def cmd_train(args: argparse.Namespace) -> None:
         asset_metrics[col] = metrics
 
     valid_values = [
-        m["cv_accuracy_mean"]
-        for m in asset_metrics.values()
-        if not np.isnan(m["cv_accuracy_mean"])
+        m["cv_accuracy_mean"] for m in asset_metrics.values() if not np.isnan(m["cv_accuracy_mean"])
     ]
     if len(valid_values) > 0:
         overall_mean = float(np.mean(valid_values))
@@ -651,9 +653,7 @@ def build_parser() -> argparse.ArgumentParser:
     cv.set_defaults(func=cmd_cv)
 
     # -- train -----------------------------------------------------------
-    train = sub.add_parser(
-        "train", help="Train and evaluate a predictive meta-model."
-    )
+    train = sub.add_parser("train", help="Train and evaluate a predictive meta-model.")
     _add_dataset_args(train)
 
     train_params = train.add_argument_group("training parameters")

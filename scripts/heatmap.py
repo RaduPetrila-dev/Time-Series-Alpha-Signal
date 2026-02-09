@@ -64,6 +64,7 @@ _SIGNAL_CHOICES = [
 # Sweep logic
 # ---------------------------------------------------------------------------
 
+
 def run_sweep(
     prices: pd.DataFrame,
     lookbacks: Sequence[int],
@@ -94,9 +95,7 @@ def run_sweep(
     n_rows = len(lookbacks)
     n_cols = len(grosses)
     sharpes = np.zeros((n_rows, n_cols))
-    details: list[list[dict[str, Any]]] = [
-        [{} for _ in range(n_cols)] for _ in range(n_rows)
-    ]
+    details: list[list[dict[str, Any]]] = [[{} for _ in range(n_cols)] for _ in range(n_rows)]
 
     total = n_rows * n_cols
     count = 0
@@ -112,9 +111,7 @@ def run_sweep(
                 gross,
             )
 
-            result: BacktestResult = backtest(
-                prices, lookback=lb, max_gross=gross, **kwargs
-            )
+            result: BacktestResult = backtest(prices, lookback=lb, max_gross=gross, **kwargs)
 
             sharpe = result.metrics.get("sharpe", float("nan"))
             sharpes[i, j] = sharpe
@@ -122,9 +119,11 @@ def run_sweep(
 
     return sharpes, details
 
+
 # ---------------------------------------------------------------------------
 # Visualisation
 # ---------------------------------------------------------------------------
+
 
 def plot_heatmap(
     matrix: np.ndarray,
@@ -148,9 +147,7 @@ def plot_heatmap(
     signal_type : str
         Signal name for the title.
     """
-    fig, ax = plt.subplots(
-        figsize=(2.0 + 1.0 * len(grosses), 1.5 + 0.7 * len(lookbacks))
-    )
+    fig, ax = plt.subplots(figsize=(2.0 + 1.0 * len(grosses), 1.5 + 0.7 * len(lookbacks)))
 
     # Color map: diverging around zero
     vmax = max(abs(np.nanmin(matrix)), abs(np.nanmax(matrix)), 0.5)
@@ -169,9 +166,14 @@ def plot_heatmap(
             val = matrix[i, j]
             color = "white" if abs(val) > vmax * 0.6 else "black"
             ax.text(
-                j, i, f"{val:.2f}",
-                ha="center", va="center",
-                fontsize=9, color=color, fontweight="bold",
+                j,
+                i,
+                f"{val:.2f}",
+                ha="center",
+                va="center",
+                fontsize=9,
+                color=color,
+                fontweight="bold",
             )
 
     ax.set_xticks(range(len(grosses)))
@@ -194,9 +196,11 @@ def plot_heatmap(
     plt.close(fig)
     logger.info("Saved heatmap to %s/heatmap.png", out_path)
 
+
 # ---------------------------------------------------------------------------
 # CSV export
 # ---------------------------------------------------------------------------
+
 
 def write_csv(
     details: list[list[dict[str, Any]]],
@@ -235,9 +239,11 @@ def write_csv(
     df.to_csv(csv_path, index=False)
     logger.info("Saved metrics CSV to %s", csv_path)
 
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -349,9 +355,7 @@ def main() -> None:
     if args.csv:
         prices = load_csv_prices(args.csv)
     else:
-        prices = load_synthetic_prices(
-            n_names=args.n_names, n_days=args.n_days, seed=args.seed
-        )
+        prices = load_synthetic_prices(n_names=args.n_names, n_days=args.n_days, seed=args.seed)
 
     logger.info(
         "Sweep: signal=%s, %d lookbacks x %d grosses = %d combinations.",
@@ -378,7 +382,10 @@ def main() -> None:
 
     # Outputs
     plot_heatmap(
-        sharpe_matrix, args.lookbacks, args.grosses, out_path,
+        sharpe_matrix,
+        args.lookbacks,
+        args.grosses,
+        out_path,
         signal_type=args.signal,
     )
     write_csv(details, args.lookbacks, args.grosses, out_path)
@@ -401,6 +408,7 @@ def main() -> None:
     }
     print(json.dumps(summary, indent=2))
     logger.info("Best: lookback=%d, gross=%.2f, Sharpe=%.3f", best_lb, best_gross, best_sharpe)
+
 
 if __name__ == "__main__":
     main()

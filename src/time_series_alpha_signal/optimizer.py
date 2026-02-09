@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # Leverage constraint
 # ---------------------------------------------------------------------------
 
+
 def enforce_leverage(
     weights: pd.DataFrame,
     max_leverage: float,
@@ -63,9 +64,11 @@ def enforce_leverage(
     scale = np.minimum(max_leverage / gross.replace(0, np.inf), 1.0)
     return weights.mul(scale, axis=0)
 
+
 # ---------------------------------------------------------------------------
 # Optimisation result
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class OptimizationResult:
@@ -99,15 +102,15 @@ class OptimizationResult:
             "best_value": self.best_value,
             "best_mean_sharpe": self.best_mean_sharpe,
             "param_name": self.param_name,
-            "grid_results": {
-                str(k): v for k, v in self.grid_results.items()
-            },
+            "grid_results": {str(k): v for k, v in self.grid_results.items()},
             "final_metrics": self.final_metrics,
         }
+
 
 # ---------------------------------------------------------------------------
 # Generic parameter search
 # ---------------------------------------------------------------------------
+
 
 def optimize_parameter(
     prices: pd.DataFrame,
@@ -232,9 +235,7 @@ def optimize_parameter(
             best_value = value
 
     if best_value is None:
-        raise RuntimeError(
-            f"No candidate for '{param_name}' produced a valid Sharpe ratio."
-        )
+        raise RuntimeError(f"No candidate for '{param_name}' produced a valid Sharpe ratio.")
 
     logger.info(
         "Best %s=%s with mean Sharpe=%.3f.",
@@ -269,9 +270,11 @@ def optimize_parameter(
         final_metrics=final_metrics,
     )
 
+
 # ---------------------------------------------------------------------------
 # EWMA convenience wrapper
 # ---------------------------------------------------------------------------
+
 
 def optimize_ewma(
     prices: pd.DataFrame,

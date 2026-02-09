@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 # Volatility estimation
 # ---------------------------------------------------------------------------
 
+
 def daily_volatility(
     prices: pd.Series,
     span: int = 100,
@@ -60,9 +61,11 @@ def daily_volatility(
     vol = returns.ewm(span=span, adjust=False).std()
     return vol.bfill()
 
+
 # ---------------------------------------------------------------------------
 # Barrier construction
 # ---------------------------------------------------------------------------
+
 
 def get_vertical_barriers(
     prices: pd.Series,
@@ -94,6 +97,7 @@ def get_vertical_barriers(
     pos = np.arange(len(idx)) + horizon
     pos = np.clip(pos, 0, len(idx) - 1)
     return pd.Series(idx[pos], index=idx)
+
 
 def get_events(
     prices: pd.Series,
@@ -147,9 +151,11 @@ def get_events(
         logger.debug("Dropped %d events with non-positive volatility.", n_dropped)
     return df.loc[valid]
 
+
 # ---------------------------------------------------------------------------
 # Triple-barrier labelling
 # ---------------------------------------------------------------------------
+
 
 def _label_single_event(
     prices: pd.Series,
@@ -200,6 +206,7 @@ def _label_single_event(
     terminal_return = window.iloc[-1] - prices.loc[t0]
     return int(np.sign(terminal_return))
 
+
 def apply_triple_barrier(
     prices: pd.Series,
     events: pd.DataFrame,
@@ -248,9 +255,11 @@ def apply_triple_barrier(
 
     return result
 
+
 # ---------------------------------------------------------------------------
 # Convenience wrapper
 # ---------------------------------------------------------------------------
+
 
 def triple_barrier_labels(
     prices: pd.Series,
@@ -298,9 +307,11 @@ def triple_barrier_labels(
 
     return apply_triple_barrier(prices, events)
 
+
 # ---------------------------------------------------------------------------
 # Meta-labels (vectorised)
 # ---------------------------------------------------------------------------
+
 
 def meta_label(
     base_labels: pd.Series,

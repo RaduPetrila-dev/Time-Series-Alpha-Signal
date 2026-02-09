@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # Result container
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class MetaModelResult:
     """Structured result from :func:`train_meta_model`.
@@ -75,9 +76,11 @@ class MetaModelResult:
             "n_negative": self.n_negative,
         }
 
+
 # ---------------------------------------------------------------------------
 # Realised returns (vectorised)
 # ---------------------------------------------------------------------------
+
 
 def _compute_realized_returns(
     prices: pd.Series,
@@ -119,9 +122,11 @@ def _compute_realized_returns(
 
     return pd.Series(returns, index=events.index, dtype=float)
 
+
 # ---------------------------------------------------------------------------
 # Feature construction
 # ---------------------------------------------------------------------------
+
 
 def build_features(
     prices: pd.Series,
@@ -179,9 +184,11 @@ def build_features(
 
     return features
 
+
 # ---------------------------------------------------------------------------
 # Model training
 # ---------------------------------------------------------------------------
+
 
 def train_meta_model(
     prices: pd.Series,

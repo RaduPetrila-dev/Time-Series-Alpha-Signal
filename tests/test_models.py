@@ -70,9 +70,7 @@ class TestTrainMetaModel:
 
     def test_fold_accuracies_length(self, random_prices: pd.Series) -> None:
         n_splits = 3
-        metrics = train_meta_model(
-            random_prices, lookback=10, n_splits=n_splits
-        )
+        metrics = train_meta_model(random_prices, lookback=10, n_splits=n_splits)
         if not np.isnan(metrics["cv_accuracy_mean"]):
             assert len(metrics["fold_accuracies"]) <= n_splits
             for acc in metrics["fold_accuracies"]:
@@ -131,9 +129,7 @@ class TestComputeRealizedReturns:
         assert abs(returns.iloc[0] - 0.10) < 1e-6  # (110-100)/100
         assert abs(returns.iloc[1] - (112 - 105) / 105) < 1e-6
 
-    def test_output_aligned_to_event_index(
-        self, random_prices: pd.Series
-    ) -> None:
+    def test_output_aligned_to_event_index(self, random_prices: pd.Series) -> None:
         events = triple_barrier_labels(random_prices, horizon=5)
         returns = _compute_realized_returns(random_prices, events)
         assert returns.index.equals(events.index)

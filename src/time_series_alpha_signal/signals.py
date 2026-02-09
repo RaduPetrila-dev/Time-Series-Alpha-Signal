@@ -55,8 +55,7 @@ def arima_signal(
         from statsmodels.tsa.arima.model import ARIMA
     except ImportError as exc:
         raise RuntimeError(
-            "statsmodels is required for arima_signal. "
-            "Install with: pip install statsmodels"
+            "statsmodels is required for arima_signal. Install with: pip install statsmodels"
         ) from exc
     rets = prices.pct_change().dropna()
     signals = pd.DataFrame(index=rets.index, columns=rets.columns, dtype=float)
@@ -74,7 +73,8 @@ def arima_signal(
     if n_fallback > 0:
         logger.warning(
             "ARIMA fit failed for %d/%d assets; used rolling mean fallback.",
-            n_fallback, len(rets.columns),
+            n_fallback,
+            len(rets.columns),
         )
     return signals.shift(1)
 
@@ -88,7 +88,9 @@ def volatility_signal(prices: pd.DataFrame, lookback: int = 20) -> pd.DataFrame:
 
 
 def volatility_scaled_momentum_signal(
-    prices: pd.DataFrame, lookback: int = 20, vol_window: int = 20,
+    prices: pd.DataFrame,
+    lookback: int = 20,
+    vol_window: int = 20,
 ) -> pd.DataFrame:
     _validate_prices(prices)
     _validate_lookback(lookback)
@@ -101,7 +103,10 @@ def volatility_scaled_momentum_signal(
 
 
 def regime_switch_signal(
-    prices: pd.DataFrame, lookback: int = 20, vol_window: int = 20, vol_threshold: float = 0.02,
+    prices: pd.DataFrame,
+    lookback: int = 20,
+    vol_window: int = 20,
+    vol_threshold: float = 0.02,
 ) -> pd.DataFrame:
     _validate_prices(prices)
     _validate_lookback(lookback)
@@ -128,7 +133,9 @@ def ewma_momentum_signal(prices: pd.DataFrame, span: int = 20) -> pd.DataFrame:
 
 
 def moving_average_crossover_signal(
-    prices: pd.DataFrame, ma_short: int = 10, ma_long: int = 50,
+    prices: pd.DataFrame,
+    ma_short: int = 10,
+    ma_long: int = 50,
 ) -> pd.DataFrame:
     _validate_prices(prices)
     _validate_lookback(ma_short, "ma_short")

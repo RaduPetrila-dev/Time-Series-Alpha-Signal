@@ -196,9 +196,7 @@ def fracdiff_df(
         Fractionally differenced DataFrame with the same shape and
         index.
     """
-    result = {
-        col: fracdiff_series(df[col], d=d, thresh=thresh) for col in df.columns
-    }
+    result = {col: fracdiff_series(df[col], d=d, thresh=thresh) for col in df.columns}
     return pd.DataFrame(result, index=df.index)
 
 
@@ -277,8 +275,7 @@ def pick_min_d(
         from statsmodels.tsa.stattools import adfuller  # type: ignore
     except ImportError as exc:
         raise RuntimeError(
-            "statsmodels is required for pick_min_d. "
-            "Install with: pip install statsmodels"
+            "statsmodels is required for pick_min_d. Install with: pip install statsmodels"
         ) from exc
 
     clean = series.dropna()
@@ -288,8 +285,7 @@ def pick_min_d(
         fd = fracdiff_series(clean, d=d).dropna()
         if len(fd) < min_obs:
             logger.debug(
-                "d=%.2f: only %d observations after differencing "
-                "(need %d), skipping.",
+                "d=%.2f: only %d observations after differencing (need %d), skipping.",
                 d,
                 len(fd),
                 min_obs,
@@ -319,8 +315,7 @@ def pick_min_d(
     fallback_d = max(candidates)
     fallback_pval = tested.get(fallback_d, float("nan"))
     logger.warning(
-        "No candidate achieved stationarity (p < %.2f). "
-        "Falling back to d=%.2f (p=%.4f).",
+        "No candidate achieved stationarity (p < %.2f). Falling back to d=%.2f (p=%.4f).",
         p_threshold,
         fallback_d,
         fallback_pval,
