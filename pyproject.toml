@@ -14,7 +14,7 @@ dependencies = [
   "matplotlib>=3.7",
   "scipy>=1.10",
   "scikit-learn>=1.2",
-  "yfinance>=0.2",
+  "yfinance>=0.2.44",
 ]
 
 [project.optional-dependencies]
