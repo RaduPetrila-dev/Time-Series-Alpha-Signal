@@ -1,0 +1,120 @@
+name: Combined Signal Backtests
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-combined:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install
+        run: |
+          set -e
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,arima]"
+          pip install --upgrade yfinance
+
+      # ---- FAANG basket ----
+
+      - name: FAANG equal-weight blend
+        run: |
+          python scripts/run_combined.py \
+            --tickers AAPL,AMZN,GOOGL,META,NFLX \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum \
+            --mode equal_weight \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 10 --max-gross 1.0 \
+            --output results/faang_combined_eqw \
+            -v 2>&1
+
+      - name: FAANG walk-forward optimised
+        run: |
+          python scripts/run_combined.py \
+            --tickers AAPL,AMZN,GOOGL,META,NFLX \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum,volatility \
+            --mode walk_forward \
+            --train-days 504 --test-days 252 --step-days 252 \
+            --weight-step 0.25 \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 10 --max-gross 1.0 \
+            --output results/faang_combined_wf \
+            -v 2>&1
+
+      # ---- Crypto basket ----
+
+      - name: Crypto equal-weight blend
+        run: |
+          python scripts/run_combined.py \
+            --tickers BTC-USD,ETH-USD \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum \
+            --mode equal_weight \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 20 --max-gross 1.0 \
+            --output results/crypto_combined_eqw \
+            -v 2>&1
+
+      - name: Crypto walk-forward optimised
+        run: |
+          python scripts/run_combined.py \
+            --tickers BTC-USD,ETH-USD \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum,volatility \
+            --mode walk_forward \
+            --train-days 504 --test-days 252 --step-days 252 \
+            --weight-step 0.25 \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 20 --max-gross 1.0 \
+            --output results/crypto_combined_wf \
+            -v 2>&1
+
+      # ---- Summary ----
+
+      - name: Summarise all results
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, pathlib
+
+          root = pathlib.Path("results")
+          for m in sorted(root.rglob("metrics.json")):
+              d = json.loads(m.read_text())
+              name = str(m.parent.relative_to(root))
+
+              # Handle both flat metrics and nested overall_metrics
+              metrics = d.get("overall_metrics", d)
+              sharpe_key = "oos_sharpe" if "oos_sharpe" in metrics else "sharpe"
+              cagr_key = "oos_cagr" if "oos_cagr" in metrics else "cagr"
+              dd_key = "oos_max_dd" if "oos_max_dd" in metrics else "max_dd"
+
+              sharpe = metrics.get(sharpe_key, float("nan"))
+              cagr = metrics.get(cagr_key, float("nan"))
+              max_dd = metrics.get(dd_key, float("nan"))
+
+              print(f"{name}: Sharpe={sharpe:.3f}, CAGR={cagr:.4f}, MaxDD={max_dd:.2%}")
+          PY
+
+      - name: Commit results
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          if [ -d results ]; then
+            git add results
+            git commit -m "Update combined signal backtest results [skip ci]" || echo "No changes"
+            git push || true
+          else
+            echo "No results directory found; skipping commit."
+          fi
