@@ -198,7 +198,7 @@ def train_meta_model(
     horizon: int = 5,
     n_splits: int = 5,
     embargo_pct: float = 0.0,
-) -> dict[str, float]:
+) -> dict[str, float | int | list[float]]:
     """Train and evaluate a logistic meta-model on a single asset.
 
     Builds features and meta-labels from the price series, then fits
