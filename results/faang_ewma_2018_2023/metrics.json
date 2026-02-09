@@ -1,0 +1,18 @@
+{
+  "days": 1509,
+  "cagr": -0.0149503634942042,
+  "ann_vol": 0.15021951968027736,
+  "sharpe": -0.026030490508377923,
+  "max_dd": -0.3760901381100533,
+  "calmar": -0.039752075311874704,
+  "hit_rate": 0.49104180491041804,
+  "win_loss_ratio": 1.031322330942169,
+  "turnover_daily": 0.29953611663353213,
+  "max_gross": 1.0,
+  "lookback": 20,
+  "cost_bps": 10.0,
+  "signal_type": "ewma_momentum",
+  "rebalance": "daily",
+  "impact_model": "proportional",
+  "ewma_span": 30
+}
