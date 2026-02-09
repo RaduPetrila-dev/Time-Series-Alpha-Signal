@@ -34,6 +34,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
 
 from time_series_alpha_signal.combiner import (  # noqa: E402
     blend_equal_weight,
