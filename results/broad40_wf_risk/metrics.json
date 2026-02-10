@@ -1,11 +1,11 @@
 {
   "overall_metrics": {
     "oos_days": 757,
-    "oos_cagr": 0.05133689857031709,
-    "oos_ann_vol": 0.10199025962112233,
-    "oos_sharpe": 0.5415361136781964,
-    "oos_max_dd": -0.11952669175951425,
-    "oos_calmar": 0.42950154325032347,
+    "oos_cagr": -0.025033756736794976,
+    "oos_ann_vol": 0.10305734813532677,
+    "oos_sharpe": -0.19442438340255358,
+    "oos_max_dd": -0.1774072400436143,
+    "oos_calmar": -0.141108991553223,
     "n_windows": 3,
     "signals": [
       "momentum",
@@ -29,13 +29,13 @@
       "test_start": "2020-01-03",
       "test_end": "2020-12-31",
       "best_weights": {
-        "momentum": 0.25,
-        "mean_reversion": 0.0,
-        "ewma_momentum": 0.25,
+        "momentum": 0.0,
+        "mean_reversion": 0.5,
+        "ewma_momentum": 0.0,
         "volatility": 0.5
       },
-      "train_sharpe": 0.11006742631106042,
-      "oos_sharpe": 0.5430843653963157,
+      "train_sharpe": 0.8656220373904275,
+      "oos_sharpe": -0.3321867023047595,
       "oos_days": 253
     },
     {
@@ -45,13 +45,13 @@
       "test_start": "2021-01-04",
       "test_end": "2021-12-31",
       "best_weights": {
-        "momentum": 0.25,
+        "momentum": 0.5,
         "mean_reversion": 0.0,
         "ewma_momentum": 0.0,
-        "volatility": 0.75
+        "volatility": 0.5
       },
-      "train_sharpe": 0.6544881577453561,
-      "oos_sharpe": 1.7381155232142507,
+      "train_sharpe": 0.373378610599217,
+      "oos_sharpe": -0.5472050987017136,
       "oos_days": 253
     },
     {
@@ -61,13 +61,13 @@
       "test_start": "2022-01-03",
       "test_end": "2023-01-03",
       "best_weights": {
-        "momentum": 0.25,
-        "mean_reversion": 0.0,
+        "momentum": 0.0,
+        "mean_reversion": 0.25,
         "ewma_momentum": 0.0,
         "volatility": 0.75
       },
-      "train_sharpe": 1.601186067153327,
-      "oos_sharpe": -0.5566557120093668,
+      "train_sharpe": 0.234826520260365,
+      "oos_sharpe": 0.33116168638088866,
       "oos_days": 253
     }
   ]
