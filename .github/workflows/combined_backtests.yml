@@ -6,9 +6,28 @@ on:
 permissions:
   contents: write
 
+# 40 liquid S&P 100 constituents across 10 GICS sectors.
+# Chosen for: high liquidity, low bid-ask, continuous 2018-2023 history.
+#
+# Tech:       AAPL, MSFT, GOOGL, META, NVDA, ADBE, CRM, INTC
+# Healthcare: JNJ, UNH, PFE, ABBV, MRK, TMO
+# Financials: JPM, BAC, GS, MS, BLK
+# Consumer:   AMZN, WMT, KO, PEP, MCD, NKE
+# Industrials: CAT, HON, UPS, BA
+# Energy:     XOM, CVX, COP
+# Utilities:  NEE, DUK
+# Materials:  LIN, APD
+# Real Estate: AMT, PLD
+# Comms:      NFLX, DIS
+
+env:
+  BROAD_TICKERS: >-
+    AAPL,MSFT,GOOGL,META,NVDA,ADBE,CRM,INTC,JNJ,UNH,PFE,ABBV,MRK,TMO,JPM,BAC,GS,MS,BLK,AMZN,WMT,KO,PEP,MCD,NKE,CAT,HON,UPS,BA,XOM,CVX,COP,NEE,DUK,LIN,APD,AMT,PLD,NFLX,DIS
+
 jobs:
   run-combined:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,7 +44,71 @@ jobs:
           pip install -e ".[dev,arima]"
           pip install --upgrade yfinance
 
-      # ---- FAANG basket (baseline) ----
+      # ================================================================
+      # BROAD EQUITY UNIVERSE (40 stocks, 10 sectors)
+      # ================================================================
+
+      - name: Broad universe equal-weight baseline
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum \
+            --mode equal_weight \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 10 --max-gross 1.0 \
+            --output results/broad40_eqw_baseline \
+            -v 2>&1
+
+      - name: Broad universe equal-weight with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum \
+            --mode equal_weight \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 10 --max-gross 1.0 \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 5 \
+            --vol-target 0.10 --max-leverage 2.0 \
+            --output results/broad40_eqw_risk \
+            -v 2>&1
+
+      - name: Broad universe walk-forward baseline
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum,volatility \
+            --mode walk_forward \
+            --train-days 504 --test-days 252 --step-days 252 \
+            --weight-step 0.25 \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 10 --max-gross 1.0 \
+            --output results/broad40_wf_baseline \
+            -v 2>&1
+
+      - name: Broad universe walk-forward with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,mean_reversion,ewma_momentum,volatility \
+            --mode walk_forward \
+            --train-days 504 --test-days 252 --step-days 252 \
+            --weight-step 0.25 \
+            --lookback 20 --ewma-span 30 \
+            --cost-bps 10 --max-gross 1.0 \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 5 \
+            --vol-target 0.10 --max-leverage 2.0 \
+            --output results/broad40_wf_risk \
+            -v 2>&1
+
+      # ================================================================
+      # FAANG basket (5 stocks, concentrated tech)
+      # ================================================================
 
       - name: FAANG equal-weight baseline
         run: |
@@ -37,23 +120,6 @@ jobs:
             --lookback 20 --ewma-span 30 \
             --cost-bps 10 --max-gross 1.0 \
             --output results/faang_combined_eqw \
-            -v 2>&1
-
-      # ---- FAANG basket (risk model) ----
-
-      - name: FAANG equal-weight with risk model
-        run: |
-          python scripts/run_combined.py \
-            --tickers AAPL,AMZN,GOOGL,META,NFLX \
-            --start 2018-01-01 --end 2023-12-31 \
-            --signals momentum,mean_reversion,ewma_momentum \
-            --mode equal_weight \
-            --lookback 20 --ewma-span 30 \
-            --cost-bps 10 --max-gross 1.0 \
-            --risk-model \
-            --clip-zscore 2.0 --smooth-halflife 5 \
-            --vol-target 0.10 --max-leverage 2.0 \
-            --output results/faang_combined_eqw_risk \
             -v 2>&1
 
       - name: FAANG walk-forward with risk model
@@ -73,7 +139,9 @@ jobs:
             --output results/faang_combined_wf_risk \
             -v 2>&1
 
-      # ---- Crypto basket (baseline) ----
+      # ================================================================
+      # Crypto basket (2 tokens, high vol)
+      # ================================================================
 
       - name: Crypto equal-weight baseline
         run: |
@@ -85,23 +153,6 @@ jobs:
             --lookback 20 --ewma-span 30 \
             --cost-bps 20 --max-gross 1.0 \
             --output results/crypto_combined_eqw \
-            -v 2>&1
-
-      # ---- Crypto basket (risk model) ----
-
-      - name: Crypto equal-weight with risk model
-        run: |
-          python scripts/run_combined.py \
-            --tickers BTC-USD,ETH-USD \
-            --start 2018-01-01 --end 2023-12-31 \
-            --signals momentum,mean_reversion,ewma_momentum \
-            --mode equal_weight \
-            --lookback 20 --ewma-span 30 \
-            --cost-bps 20 --max-gross 1.0 \
-            --risk-model \
-            --clip-zscore 2.0 --smooth-halflife 5 \
-            --vol-target 0.15 --max-leverage 2.0 \
-            --output results/crypto_combined_eqw_risk \
             -v 2>&1
 
       - name: Crypto walk-forward with risk model
@@ -121,7 +172,9 @@ jobs:
             --output results/crypto_combined_wf_risk \
             -v 2>&1
 
-      # ---- Summary ----
+      # ================================================================
+      # Summary
+      # ================================================================
 
       - name: Summarise all results
         shell: bash
@@ -130,6 +183,8 @@ jobs:
           import json, pathlib
 
           root = pathlib.Path("results")
+          print(f"{'Strategy':<35} {'Sharpe':>8} {'CAGR':>8} {'MaxDD':>8} {'AnnVol':>8}")
+          print("-" * 75)
           for m in sorted(root.rglob("metrics.json")):
               d = json.loads(m.read_text())
               name = str(m.parent.relative_to(root))
@@ -138,12 +193,14 @@ jobs:
               sharpe_key = "oos_sharpe" if "oos_sharpe" in metrics else "sharpe"
               cagr_key = "oos_cagr" if "oos_cagr" in metrics else "cagr"
               dd_key = "oos_max_dd" if "oos_max_dd" in metrics else "max_dd"
+              vol_key = "oos_ann_vol" if "oos_ann_vol" in metrics else "ann_vol"
 
               sharpe = metrics.get(sharpe_key, float("nan"))
               cagr = metrics.get(cagr_key, float("nan"))
               max_dd = metrics.get(dd_key, float("nan"))
+              ann_vol = metrics.get(vol_key, float("nan"))
 
-              print(f"{name}: Sharpe={sharpe:.3f}, CAGR={cagr:.4f}, MaxDD={max_dd:.2%}")
+              print(f"{name:<35} {sharpe:>8.3f} {cagr:>7.2%} {max_dd:>7.2%} {ann_vol:>7.2%}")
           PY
 
       - name: Commit results
@@ -152,7 +209,7 @@ jobs:
           git config user.email "actions@github.com"
           if [ -d results ]; then
             git add results
-            git commit -m "Update combined signal backtest results [skip ci]" || echo "No changes"
+            git commit -m "Update backtest results: broad 40-stock universe [skip ci]" || echo "No changes"
             git push || true
           else
             echo "No results directory found; skipping commit."
