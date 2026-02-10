@@ -27,7 +27,7 @@ env:
 jobs:
   run-combined:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,9 +46,11 @@ jobs:
 
       # ================================================================
       # BROAD EQUITY UNIVERSE (40 stocks, 10 sectors)
+      # Key difference vs FAANG: longer smoothing (10d halflife) to
+      # reduce turnover on 40 names, and vol target at 10%.
       # ================================================================
 
-      - name: Broad universe equal-weight baseline
+      - name: Broad universe equal-weight baseline (no risk model)
         run: |
           python scripts/run_combined.py \
             --tickers ${{ env.BROAD_TICKERS }} \
@@ -70,23 +72,9 @@ jobs:
             --lookback 20 --ewma-span 30 \
             --cost-bps 10 --max-gross 1.0 \
             --risk-model \
-            --clip-zscore 2.0 --smooth-halflife 5 \
+            --clip-zscore 2.0 --smooth-halflife 10 \
             --vol-target 0.10 --max-leverage 2.0 \
             --output results/broad40_eqw_risk \
-            -v 2>&1
-
-      - name: Broad universe walk-forward baseline
-        run: |
-          python scripts/run_combined.py \
-            --tickers ${{ env.BROAD_TICKERS }} \
-            --start 2018-01-01 --end 2023-12-31 \
-            --signals momentum,mean_reversion,ewma_momentum,volatility \
-            --mode walk_forward \
-            --train-days 504 --test-days 252 --step-days 252 \
-            --weight-step 0.25 \
-            --lookback 20 --ewma-span 30 \
-            --cost-bps 10 --max-gross 1.0 \
-            --output results/broad40_wf_baseline \
             -v 2>&1
 
       - name: Broad universe walk-forward with risk model
@@ -94,16 +82,48 @@ jobs:
           python scripts/run_combined.py \
             --tickers ${{ env.BROAD_TICKERS }} \
             --start 2018-01-01 --end 2023-12-31 \
-            --signals momentum,mean_reversion,ewma_momentum,volatility \
+            --signals momentum,ewma_momentum,volatility \
             --mode walk_forward \
             --train-days 504 --test-days 252 --step-days 252 \
-            --weight-step 0.25 \
+            --weight-step 0.5 \
             --lookback 20 --ewma-span 30 \
             --cost-bps 10 --max-gross 1.0 \
             --risk-model \
-            --clip-zscore 2.0 --smooth-halflife 5 \
+            --clip-zscore 2.0 --smooth-halflife 10 \
             --vol-target 0.10 --max-leverage 2.0 \
             --output results/broad40_wf_risk \
+            -v 2>&1
+
+      # Momentum-only baseline on broad universe (simplest strategy)
+      - name: Broad universe momentum-only with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,ewma_momentum \
+            --mode equal_weight \
+            --lookback 60 --ewma-span 60 \
+            --cost-bps 10 --max-gross 1.0 \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 10 \
+            --vol-target 0.10 --max-leverage 2.0 \
+            --output results/broad40_mom_risk \
+            -v 2>&1
+
+      # Longer lookback momentum (classic Jegadeesh-Titman 12-1 style)
+      - name: Broad universe 12-1 momentum with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,ewma_momentum \
+            --mode equal_weight \
+            --lookback 252 --ewma-span 252 \
+            --cost-bps 10 --max-gross 1.0 \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 10 \
+            --vol-target 0.10 --max-leverage 2.0 \
+            --output results/broad40_12m_mom_risk \
             -v 2>&1
 
       # ================================================================
