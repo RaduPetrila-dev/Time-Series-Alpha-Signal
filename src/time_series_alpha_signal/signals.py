@@ -45,6 +45,7 @@ def mean_reversion_signal(prices: pd.DataFrame, lookback: int = 20) -> pd.DataFr
     rev = -rets.rolling(lookback).sum()
     return rev.shift(1)
 
+
 def skip_month_momentum_signal(
     prices: pd.DataFrame,
     lookback: int = 252,
@@ -137,7 +138,6 @@ def residual_momentum_signal(
     signal = residual_cum - residual_cum_skip
 
     return signal.shift(1)
-
 
 
 def arima_signal(

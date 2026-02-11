@@ -179,7 +179,10 @@ def apply_risk_model(
 
     if config.inverse_vol:
         w = inverse_vol_weight(
-            w, prices, lookback=config.vol_lookback, vol_floor=config.vol_floor,
+            w,
+            prices,
+            lookback=config.vol_lookback,
+            vol_floor=config.vol_floor,
         )
         logger.debug("Applied inverse-vol weighting, lookback=%d", config.vol_lookback)
 
@@ -187,13 +190,17 @@ def apply_risk_model(
 
     if config.vol_target > 0:
         w = vol_target_scale(
-            w, prices, target_vol=config.vol_target,
+            w,
+            prices,
+            target_vol=config.vol_target,
             lookback=config.vol_target_lookback,
-            vol_floor=config.vol_floor, max_leverage=config.max_leverage,
+            vol_floor=config.vol_floor,
+            max_leverage=config.max_leverage,
         )
         logger.debug(
             "Applied vol targeting: target=%.1f%%, max_leverage=%.1f",
-            config.vol_target * 100, config.max_leverage,
+            config.vol_target * 100,
+            config.max_leverage,
         )
 
     return w
