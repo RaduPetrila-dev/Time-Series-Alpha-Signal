@@ -109,25 +109,31 @@ def _save_walk_forward_chart(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Run combined signal backtests."
-    )
+    parser = argparse.ArgumentParser(description="Run combined signal backtests.")
     parser.add_argument(
-        "--tickers", type=str, required=True,
+        "--tickers",
+        type=str,
+        required=True,
         help="Comma-separated tickers (e.g. AAPL,AMZN or BTC-USD,ETH-USD).",
     )
     parser.add_argument(
-        "--csv", type=str, default=None,
+        "--csv",
+        type=str,
+        default=None,
         help="Path to CSV file (overrides --tickers).",
     )
     parser.add_argument("--start", type=str, default="2018-01-01")
     parser.add_argument("--end", type=str, default="2023-12-31")
     parser.add_argument(
-        "--signals", type=str, required=True,
+        "--signals",
+        type=str,
+        required=True,
         help="Comma-separated signal names.",
     )
     parser.add_argument(
-        "--mode", type=str, default="equal_weight",
+        "--mode",
+        type=str,
+        default="equal_weight",
         choices=["equal_weight", "walk_forward", "both"],
     )
     parser.add_argument("--max-gross", dest="max_gross", type=float, default=1.0)
@@ -144,13 +150,19 @@ def main() -> None:
     parser.add_argument("-v", "--verbose", action="store_true")
 
     parser.add_argument(
-        "--risk-model", dest="risk_model", action="store_true", default=False,
+        "--risk-model",
+        dest="risk_model",
+        action="store_true",
+        default=False,
         help="Enable the risk model pipeline.",
     )
     parser.add_argument("--clip-zscore", dest="clip_zscore", type=float, default=2.0)
     parser.add_argument("--smooth-halflife", dest="smooth_halflife", type=int, default=5)
     parser.add_argument(
-        "--no-inverse-vol", dest="inverse_vol", action="store_false", default=True,
+        "--no-inverse-vol",
+        dest="inverse_vol",
+        action="store_false",
+        default=True,
     )
     parser.add_argument("--vol-lookback", dest="vol_lookback", type=int, default=20)
     parser.add_argument("--vol-target", dest="vol_target", type=float, default=0.15)

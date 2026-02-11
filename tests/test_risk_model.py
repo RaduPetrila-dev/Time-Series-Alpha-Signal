@@ -30,7 +30,9 @@ def synthetic_signal(synthetic_prices: pd.DataFrame) -> pd.DataFrame:
     rng = np.random.default_rng(99)
     data = rng.standard_normal(synthetic_prices.shape)
     return pd.DataFrame(
-        data, index=synthetic_prices.index, columns=synthetic_prices.columns,
+        data,
+        index=synthetic_prices.index,
+        columns=synthetic_prices.columns,
     )
 
 
@@ -59,18 +61,16 @@ class TestSmoothSignal:
 
 class TestInverseVolWeight:
     def test_high_vol_gets_lower_weight(
-        self, synthetic_prices: pd.DataFrame,
+        self,
+        synthetic_prices: pd.DataFrame,
     ) -> None:
         signal = pd.DataFrame(
-            1.0, index=synthetic_prices.index, columns=synthetic_prices.columns,
+            1.0,
+            index=synthetic_prices.index,
+            columns=synthetic_prices.columns,
         )
         weighted = inverse_vol_weight(signal, synthetic_prices, lookback=20)
-        vols = (
-            synthetic_prices.pct_change()
-            .rolling(20, min_periods=10)
-            .std()
-            .iloc[-1]
-        )
+        vols = synthetic_prices.pct_change().rolling(20, min_periods=10).std().iloc[-1]
         highest_vol_asset = vols.idxmax()
         lowest_vol_asset = vols.idxmin()
         last_row = weighted.iloc[-1]
@@ -79,10 +79,13 @@ class TestInverseVolWeight:
 
 class TestVolTargetScale:
     def test_disabled_when_zero(
-        self, synthetic_prices: pd.DataFrame,
+        self,
+        synthetic_prices: pd.DataFrame,
     ) -> None:
         weights = pd.DataFrame(
-            0.2, index=synthetic_prices.index, columns=synthetic_prices.columns,
+            0.2,
+            index=synthetic_prices.index,
+            columns=synthetic_prices.columns,
         )
         result = vol_target_scale(weights, synthetic_prices, target_vol=0.0)
         pd.testing.assert_frame_equal(result, weights)
@@ -98,26 +101,34 @@ class TestNormaliseWeights:
 
 class TestApplyRiskModel:
     def test_default_config(
-        self, synthetic_signal: pd.DataFrame,
+        self,
+        synthetic_signal: pd.DataFrame,
         synthetic_prices: pd.DataFrame,
     ) -> None:
         weights = apply_risk_model(
-            synthetic_signal, synthetic_prices, config=RiskConfig(),
+            synthetic_signal,
+            synthetic_prices,
+            config=RiskConfig(),
         )
         assert weights.shape == synthetic_signal.shape
         assert np.isfinite(weights.values[100:]).all()
 
     def test_no_transforms(
-        self, synthetic_signal: pd.DataFrame,
+        self,
+        synthetic_signal: pd.DataFrame,
         synthetic_prices: pd.DataFrame,
     ) -> None:
         config = RiskConfig(
-            clip_zscore=0.0, smooth_halflife=0,
-            inverse_vol=False, vol_target=0.0,
+            clip_zscore=0.0,
+            smooth_halflife=0,
+            inverse_vol=False,
+            vol_target=0.0,
         )
         weights = apply_risk_model(
-            synthetic_signal, synthetic_prices,
-            config=config, max_gross=1.0,
+            synthetic_signal,
+            synthetic_prices,
+            config=config,
+            max_gross=1.0,
         )
         row_abs = synthetic_signal.abs().sum(axis=1).replace(0, np.nan)
         expected = synthetic_signal.div(row_abs, axis=0).fillna(0.0)
@@ -129,9 +140,14 @@ class TestRiskConfig:
         config = RiskConfig()
         d = config.to_dict()
         expected_keys = {
-            "clip_zscore", "smooth_halflife", "inverse_vol",
-            "vol_lookback", "vol_target", "vol_target_lookback",
-            "vol_floor", "max_leverage",
+            "clip_zscore",
+            "smooth_halflife",
+            "inverse_vol",
+            "vol_lookback",
+            "vol_target",
+            "vol_target_lookback",
+            "vol_floor",
+            "max_leverage",
         }
         assert set(d.keys()) == expected_keys
 

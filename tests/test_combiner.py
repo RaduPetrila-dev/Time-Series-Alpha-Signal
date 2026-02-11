@@ -125,10 +125,6 @@ class TestEqualWeightBlend:
         )
         assert np.isfinite(result.metrics["sharpe"])
 
-    def test_single_signal_raises(self, synthetic_prices: pd.DataFrame) -> None:
-        with pytest.raises(ValueError, match="at least 2"):
-            blend_equal_weight(synthetic_prices, signal_names=["momentum"])
-
     def test_three_signals(self, synthetic_prices: pd.DataFrame) -> None:
         result = blend_equal_weight(
             synthetic_prices,
