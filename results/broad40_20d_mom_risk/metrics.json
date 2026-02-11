@@ -1,0 +1,34 @@
+{
+  "days": 1509,
+  "cagr": -0.06270277780892608,
+  "ann_vol": 0.10571044761063735,
+  "sharpe": -0.5596885261661527,
+  "max_dd": -0.3457473388964609,
+  "calmar": -0.18135433235453866,
+  "hit_rate": 0.48177601060304837,
+  "win_loss_ratio": 0.9364188348451543,
+  "turnover_daily": 0.12387947434212913,
+  "max_gross": 1.0,
+  "cost_bps": 10.0,
+  "signals": [
+    "momentum",
+    "ewma_momentum"
+  ],
+  "weights": {
+    "momentum": 0.5,
+    "ewma_momentum": 0.5
+  },
+  "mode": "equal_weight",
+  "rebalance": "daily",
+  "impact_model": "proportional",
+  "risk_config": {
+    "clip_zscore": 2.0,
+    "smooth_halflife": 10,
+    "inverse_vol": true,
+    "vol_lookback": 20,
+    "vol_target": 0.1,
+    "vol_target_lookback": 63,
+    "vol_floor": 0.01,
+    "max_leverage": 2.0
+  }
+}

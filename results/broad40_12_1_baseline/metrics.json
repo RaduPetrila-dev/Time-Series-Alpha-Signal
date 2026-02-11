@@ -1,0 +1,23 @@
+{
+  "days": 1509,
+  "cagr": -0.010259248845403524,
+  "ann_vol": 0.11174625618862853,
+  "sharpe": -0.036153315903279006,
+  "max_dd": -0.2668306239622349,
+  "calmar": -0.03844854347323918,
+  "hit_rate": 0.43074884029158383,
+  "win_loss_ratio": 0.9259175035529512,
+  "turnover_daily": 0.07630148630803696,
+  "max_gross": 1.0,
+  "cost_bps": 10.0,
+  "signals": [
+    "skip_month_momentum"
+  ],
+  "weights": {
+    "skip_month_momentum": 1.0
+  },
+  "mode": "equal_weight",
+  "rebalance": "daily",
+  "impact_model": "proportional",
+  "risk_config": null
+}

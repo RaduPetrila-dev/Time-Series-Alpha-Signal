@@ -1,16 +1,15 @@
 {
   "overall_metrics": {
     "oos_days": 757,
-    "oos_cagr": 0.05133633670948723,
-    "oos_ann_vol": 0.10199020381909861,
-    "oos_sharpe": 0.5415311202531413,
-    "oos_max_dd": -0.11952661494519023,
-    "oos_calmar": 0.42949711855412176,
+    "oos_cagr": 0.014660314704431077,
+    "oos_ann_vol": 0.10176725400458093,
+    "oos_sharpe": 0.19387225717775675,
+    "oos_max_dd": -0.17123625287651278,
+    "oos_calmar": 0.08561454982902118,
     "n_windows": 3,
     "signals": [
-      "momentum",
-      "mean_reversion",
-      "ewma_momentum",
+      "skip_month_momentum",
+      "residual_momentum",
       "volatility"
     ],
     "mode": "walk_forward",
@@ -29,13 +28,12 @@
       "test_start": "2020-01-03",
       "test_end": "2020-12-31",
       "best_weights": {
-        "momentum": 0.25,
-        "mean_reversion": 0.0,
-        "ewma_momentum": 0.25,
-        "volatility": 0.5
+        "skip_month_momentum": 0.0,
+        "residual_momentum": 0.0,
+        "volatility": 1.0
       },
-      "train_sharpe": 0.11007059258249179,
-      "oos_sharpe": 0.5430867486812403,
+      "train_sharpe": 0.6967138476997086,
+      "oos_sharpe": 0.3796705461061017,
       "oos_days": 253
     },
     {
@@ -45,13 +43,12 @@
       "test_start": "2021-01-04",
       "test_end": "2021-12-31",
       "best_weights": {
-        "momentum": 0.25,
-        "mean_reversion": 0.0,
-        "ewma_momentum": 0.0,
-        "volatility": 0.75
+        "skip_month_momentum": 0.5,
+        "residual_momentum": 0.0,
+        "volatility": 0.5
       },
-      "train_sharpe": 0.6544929212717335,
-      "oos_sharpe": 1.738105662062369,
+      "train_sharpe": 0.8329785395766399,
+      "oos_sharpe": -0.9575451399931278,
       "oos_days": 253
     },
     {
@@ -61,13 +58,12 @@
       "test_start": "2022-01-03",
       "test_end": "2023-01-03",
       "best_weights": {
-        "momentum": 0.25,
-        "mean_reversion": 0.0,
-        "ewma_momentum": 0.0,
-        "volatility": 0.75
+        "skip_month_momentum": 0.0,
+        "residual_momentum": 0.0,
+        "volatility": 1.0
       },
-      "train_sharpe": 1.6011845006746148,
-      "oos_sharpe": -0.5566643096709674,
+      "train_sharpe": 0.21942896292839392,
+      "oos_sharpe": 1.0898065145618991,
       "oos_days": 253
     }
   ]

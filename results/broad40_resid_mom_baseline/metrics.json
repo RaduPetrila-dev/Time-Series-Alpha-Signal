@@ -1,0 +1,23 @@
+{
+  "days": 1509,
+  "cagr": -0.03656818957301278,
+  "ann_vol": 0.10875666358367594,
+  "sharpe": -0.28782372218705765,
+  "max_dd": -0.28388970836718275,
+  "calmar": -0.1288112548473068,
+  "hit_rate": 0.4274353876739563,
+  "win_loss_ratio": 0.8967007240169008,
+  "turnover_daily": 0.07509952673241667,
+  "max_gross": 1.0,
+  "cost_bps": 10.0,
+  "signals": [
+    "residual_momentum"
+  ],
+  "weights": {
+    "residual_momentum": 1.0
+  },
+  "mode": "equal_weight",
+  "rebalance": "daily",
+  "impact_model": "proportional",
+  "risk_config": null
+}

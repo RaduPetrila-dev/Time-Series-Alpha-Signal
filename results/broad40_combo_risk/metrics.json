@@ -1,0 +1,36 @@
+{
+  "days": 1509,
+  "cagr": -0.001748948068189371,
+  "ann_vol": 0.0991819508811296,
+  "sharpe": 0.03198393919169557,
+  "max_dd": -0.21464156581985128,
+  "calmar": -0.00814822637688575,
+  "hit_rate": 0.42412193505632867,
+  "win_loss_ratio": 0.9699193239871778,
+  "turnover_daily": 0.0563297301367515,
+  "max_gross": 1.0,
+  "cost_bps": 10.0,
+  "signals": [
+    "skip_month_momentum",
+    "residual_momentum",
+    "volatility"
+  ],
+  "weights": {
+    "skip_month_momentum": 0.3333333333333333,
+    "residual_momentum": 0.3333333333333333,
+    "volatility": 0.3333333333333333
+  },
+  "mode": "equal_weight",
+  "rebalance": "daily",
+  "impact_model": "proportional",
+  "risk_config": {
+    "clip_zscore": 2.0,
+    "smooth_halflife": 10,
+    "inverse_vol": true,
+    "vol_lookback": 20,
+    "vol_target": 0.1,
+    "vol_target_lookback": 63,
+    "vol_floor": 0.01,
+    "max_leverage": 2.0
+  }
+}
