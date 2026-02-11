@@ -209,8 +209,6 @@ def blend_equal_weight(
     -------
     CombinedResult
     """
-    if len(signal_names) < 2:
-        raise ValueError("Need at least 2 signals to blend.")
 
     signals = compute_signals(prices, signal_names, **signal_kwargs)
     dfs = list(signals.values())
@@ -392,8 +390,6 @@ def walk_forward_optimize(
     -------
     WalkForwardResult
     """
-    if len(signal_names) < 2:
-        raise ValueError("Need at least 2 signals to blend.")
 
     n = len(prices)
     min_required = train_days + test_days
