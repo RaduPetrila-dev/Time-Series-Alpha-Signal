@@ -6,20 +6,6 @@ on:
 permissions:
   contents: write
 
-# 40 liquid S&P 100 constituents across 10 GICS sectors.
-# Chosen for: high liquidity, low bid-ask, continuous 2018-2023 history.
-#
-# Tech:       AAPL, MSFT, GOOGL, META, NVDA, ADBE, CRM, INTC
-# Healthcare: JNJ, UNH, PFE, ABBV, MRK, TMO
-# Financials: JPM, BAC, GS, MS, BLK
-# Consumer:   AMZN, WMT, KO, PEP, MCD, NKE
-# Industrials: CAT, HON, UPS, BA
-# Energy:     XOM, CVX, COP
-# Utilities:  NEE, DUK
-# Materials:  LIN, APD
-# Real Estate: AMT, PLD
-# Comms:      NFLX, DIS
-
 env:
   BROAD_TICKERS: >-
     AAPL,MSFT,GOOGL,META,NVDA,ADBE,CRM,INTC,JNJ,UNH,PFE,ABBV,MRK,TMO,JPM,BAC,GS,MS,BLK,AMZN,WMT,KO,PEP,MCD,NKE,CAT,HON,UPS,BA,XOM,CVX,COP,NEE,DUK,LIN,APD,AMT,PLD,NFLX,DIS
@@ -44,91 +30,106 @@ jobs:
           pip install -e ".[dev,arima]"
           pip install --upgrade yfinance
 
-      # ================================================================
-      # BROAD EQUITY UNIVERSE (40 stocks, 10 sectors)
-      # Key difference vs FAANG: longer smoothing (10d halflife) to
-      # reduce turnover on 40 names, and vol target at 10%.
-      # ================================================================
-
-      - name: Broad universe equal-weight baseline (no risk model)
+      - name: Broad 12-1 momentum baseline
         run: |
           python scripts/run_combined.py \
             --tickers ${{ env.BROAD_TICKERS }} \
             --start 2018-01-01 --end 2023-12-31 \
-            --signals momentum,mean_reversion,ewma_momentum \
+            --signals skip_month_momentum \
             --mode equal_weight \
-            --lookback 20 --ewma-span 30 \
+            --lookback 252 --skip 21 \
             --cost-bps 10 --max-gross 1.0 \
-            --output results/broad40_eqw_baseline \
+            --output results/broad40_12_1_baseline \
             -v 2>&1
 
-      - name: Broad universe equal-weight with risk model
+      - name: Broad 12-1 momentum with risk model
         run: |
           python scripts/run_combined.py \
             --tickers ${{ env.BROAD_TICKERS }} \
             --start 2018-01-01 --end 2023-12-31 \
-            --signals momentum,mean_reversion,ewma_momentum \
+            --signals skip_month_momentum \
             --mode equal_weight \
-            --lookback 20 --ewma-span 30 \
+            --lookback 252 --skip 21 \
             --cost-bps 10 --max-gross 1.0 \
             --risk-model \
             --clip-zscore 2.0 --smooth-halflife 10 \
             --vol-target 0.10 --max-leverage 2.0 \
-            --output results/broad40_eqw_risk \
+            --output results/broad40_12_1_risk \
             -v 2>&1
 
-      - name: Broad universe walk-forward with risk model
+      - name: Broad residual momentum baseline
         run: |
           python scripts/run_combined.py \
             --tickers ${{ env.BROAD_TICKERS }} \
             --start 2018-01-01 --end 2023-12-31 \
-            --signals momentum,ewma_momentum,volatility \
+            --signals residual_momentum \
+            --mode equal_weight \
+            --lookback 252 --skip 21 \
+            --cost-bps 10 --max-gross 1.0 \
+            --output results/broad40_resid_mom_baseline \
+            -v 2>&1
+
+      - name: Broad residual momentum with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals residual_momentum \
+            --mode equal_weight \
+            --lookback 252 --skip 21 \
+            --cost-bps 10 --max-gross 1.0 \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 10 \
+            --vol-target 0.10 --max-leverage 2.0 \
+            --output results/broad40_resid_mom_risk \
+            -v 2>&1
+
+      - name: Broad 12-1 + residual + vol combo with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals skip_month_momentum,residual_momentum,volatility \
+            --mode equal_weight \
+            --lookback 252 --skip 21 \
+            --cost-bps 10 --max-gross 1.0 \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 10 \
+            --vol-target 0.10 --max-leverage 2.0 \
+            --output results/broad40_combo_risk \
+            -v 2>&1
+
+      - name: Broad walk-forward 12-1 + residual + vol with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals skip_month_momentum,residual_momentum,volatility \
             --mode walk_forward \
             --train-days 504 --test-days 252 --step-days 252 \
             --weight-step 0.5 \
+            --lookback 252 --skip 21 \
+            --cost-bps 10 --max-gross 1.0 \
+            --risk-model \
+            --clip-zscore 2.0 --smooth-halflife 10 \
+            --vol-target 0.10 --max-leverage 2.0 \
+            --output results/broad40_wf_combo_risk \
+            -v 2>&1
+
+      - name: Broad 20d momentum with risk model
+        run: |
+          python scripts/run_combined.py \
+            --tickers ${{ env.BROAD_TICKERS }} \
+            --start 2018-01-01 --end 2023-12-31 \
+            --signals momentum,ewma_momentum \
+            --mode equal_weight \
             --lookback 20 --ewma-span 30 \
             --cost-bps 10 --max-gross 1.0 \
             --risk-model \
             --clip-zscore 2.0 --smooth-halflife 10 \
             --vol-target 0.10 --max-leverage 2.0 \
-            --output results/broad40_wf_risk \
+            --output results/broad40_20d_mom_risk \
             -v 2>&1
-
-      # Momentum-only baseline on broad universe (simplest strategy)
-      - name: Broad universe momentum-only with risk model
-        run: |
-          python scripts/run_combined.py \
-            --tickers ${{ env.BROAD_TICKERS }} \
-            --start 2018-01-01 --end 2023-12-31 \
-            --signals momentum,ewma_momentum \
-            --mode equal_weight \
-            --lookback 60 --ewma-span 60 \
-            --cost-bps 10 --max-gross 1.0 \
-            --risk-model \
-            --clip-zscore 2.0 --smooth-halflife 10 \
-            --vol-target 0.10 --max-leverage 2.0 \
-            --output results/broad40_mom_risk \
-            -v 2>&1
-
-      # Longer lookback momentum (classic Jegadeesh-Titman 12-1 style)
-      - name: Broad universe 12-1 momentum with risk model
-        run: |
-          python scripts/run_combined.py \
-            --tickers ${{ env.BROAD_TICKERS }} \
-            --start 2018-01-01 --end 2023-12-31 \
-            --signals momentum,ewma_momentum \
-            --mode equal_weight \
-            --lookback 252 --ewma-span 252 \
-            --cost-bps 10 --max-gross 1.0 \
-            --risk-model \
-            --clip-zscore 2.0 --smooth-halflife 10 \
-            --vol-target 0.10 --max-leverage 2.0 \
-            --output results/broad40_12m_mom_risk \
-            -v 2>&1
-
-      # ================================================================
-      # FAANG basket (5 stocks, concentrated tech)
-      # ================================================================
 
       - name: FAANG equal-weight baseline
         run: |
@@ -159,10 +160,6 @@ jobs:
             --output results/faang_combined_wf_risk \
             -v 2>&1
 
-      # ================================================================
-      # Crypto basket (2 tokens, high vol)
-      # ================================================================
-
       - name: Crypto equal-weight baseline
         run: |
           python scripts/run_combined.py \
@@ -192,10 +189,6 @@ jobs:
             --output results/crypto_combined_wf_risk \
             -v 2>&1
 
-      # ================================================================
-      # Summary
-      # ================================================================
-
       - name: Summarise all results
         shell: bash
         run: |
@@ -203,24 +196,21 @@ jobs:
           import json, pathlib
 
           root = pathlib.Path("results")
-          print(f"{'Strategy':<35} {'Sharpe':>8} {'CAGR':>8} {'MaxDD':>8} {'AnnVol':>8}")
-          print("-" * 75)
+          print(f"{'Strategy':<40} {'Sharpe':>8} {'CAGR':>8} {'MaxDD':>8} {'AnnVol':>8}")
+          print("-" * 80)
           for m in sorted(root.rglob("metrics.json")):
               d = json.loads(m.read_text())
               name = str(m.parent.relative_to(root))
-
               metrics = d.get("overall_metrics", d)
               sharpe_key = "oos_sharpe" if "oos_sharpe" in metrics else "sharpe"
               cagr_key = "oos_cagr" if "oos_cagr" in metrics else "cagr"
               dd_key = "oos_max_dd" if "oos_max_dd" in metrics else "max_dd"
               vol_key = "oos_ann_vol" if "oos_ann_vol" in metrics else "ann_vol"
-
               sharpe = metrics.get(sharpe_key, float("nan"))
               cagr = metrics.get(cagr_key, float("nan"))
               max_dd = metrics.get(dd_key, float("nan"))
               ann_vol = metrics.get(vol_key, float("nan"))
-
-              print(f"{name:<35} {sharpe:>8.3f} {cagr:>7.2%} {max_dd:>7.2%} {ann_vol:>7.2%}")
+              print(f"{name:<40} {sharpe:>8.3f} {cagr:>7.2%} {max_dd:>7.2%} {ann_vol:>7.2%}")
           PY
 
       - name: Commit results
@@ -229,7 +219,7 @@ jobs:
           git config user.email "actions@github.com"
           if [ -d results ]; then
             git add results
-            git commit -m "Update backtest results: broad 40-stock universe [skip ci]" || echo "No changes"
+            git commit -m "Update backtest results: residual momentum + 12-1 on 40-stock universe [skip ci]" || echo "No changes"
             git push || true
           else
             echo "No results directory found; skipping commit."
