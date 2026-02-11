@@ -1,24 +1,22 @@
 {
   "days": 1509,
-  "cagr": -0.05445945915866146,
-  "ann_vol": 0.10641797704022242,
-  "sharpe": -0.47298888880066997,
-  "max_dd": -0.3187600571553827,
-  "calmar": -0.17084781463731094,
-  "hit_rate": 0.48177601060304837,
-  "win_loss_ratio": 0.950690466609915,
-  "turnover_daily": 0.11681814828087791,
+  "cagr": -0.04085668032381318,
+  "ann_vol": 0.1061613783474861,
+  "sharpe": -0.3398239623720858,
+  "max_dd": -0.2518200883496451,
+  "calmar": -0.16224551659709066,
+  "hit_rate": 0.4897282968853545,
+  "win_loss_ratio": 0.9427091066322759,
+  "turnover_daily": 0.08741268772581107,
   "max_gross": 1.0,
   "cost_bps": 10.0,
   "signals": [
     "momentum",
-    "mean_reversion",
     "ewma_momentum"
   ],
   "weights": {
-    "momentum": 0.3333333333333333,
-    "mean_reversion": 0.3333333333333333,
-    "ewma_momentum": 0.3333333333333333
+    "momentum": 0.5,
+    "ewma_momentum": 0.5
   },
   "mode": "equal_weight",
   "rebalance": "daily",
