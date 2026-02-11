@@ -55,7 +55,6 @@ def _save_plots(
     """Save equity curve, drawdown, and rolling Sharpe plots."""
     prefix = f"{title_prefix} " if title_prefix else ""
 
-    # Equity curve
     fig, ax = plt.subplots(figsize=(10, 5))
     equity.plot(ax=ax, title=f"{prefix}Equity Curve")
     ax.set_ylabel("Cumulative Return")
@@ -63,7 +62,6 @@ def _save_plots(
     fig.savefig(out_dir / "equity.png", bbox_inches="tight", dpi=150)
     plt.close(fig)
 
-    # Drawdown
     dd = equity / equity.cummax() - 1
     fig, ax = plt.subplots(figsize=(10, 4))
     dd.plot(ax=ax, title=f"{prefix}Drawdown", color="crimson")
@@ -73,7 +71,6 @@ def _save_plots(
     fig.savefig(out_dir / "drawdown.png", bbox_inches="tight", dpi=150)
     plt.close(fig)
 
-    # Rolling Sharpe
     rolling_sr = daily.rolling(63).mean() / daily.rolling(63).std() * np.sqrt(252)
     fig, ax = plt.subplots(figsize=(10, 4))
     rolling_sr.plot(ax=ax, title=f"{prefix}Rolling 63-day Sharpe Ratio")
@@ -91,7 +88,6 @@ def _save_walk_forward_chart(
     """Plot train vs OOS Sharpe per walk-forward window."""
     if not window_results:
         return
-
     windows = [w["window"] for w in window_results]
     train_sr = [w["train_sharpe"] for w in window_results]
     oos_sr = [w["oos_sharpe"] for w in window_results]
@@ -145,6 +141,7 @@ def main() -> None:
     parser.add_argument("--impact-model", dest="impact_model", type=str, default="proportional")
     parser.add_argument("--lookback", type=int, default=20)
     parser.add_argument("--ewma-span", dest="ewma_span", type=int, default=20)
+    parser.add_argument("--skip", type=int, default=21, help="Skip days for skip_month_momentum.")
     parser.add_argument("--train-days", dest="train_days", type=int, default=504)
     parser.add_argument("--test-days", dest="test_days", type=int, default=252)
     parser.add_argument("--step-days", dest="step_days", type=int, default=252)
@@ -152,7 +149,6 @@ def main() -> None:
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("-v", "--verbose", action="store_true")
 
-    # Risk model arguments
     parser.add_argument(
         "--risk-model",
         dest="risk_model",
@@ -182,7 +178,6 @@ def main() -> None:
         stream=sys.stderr,
     )
 
-    # Build risk config
     risk_config = None
     if args.risk_model:
         risk_config = RiskConfig(
@@ -196,7 +191,6 @@ def main() -> None:
         )
         logger.info("Risk model enabled: %s", risk_config.to_dict())
 
-    # Load prices
     if args.csv:
         prices = load_csv_prices(args.csv)
     else:
@@ -209,11 +203,11 @@ def main() -> None:
     signal_kwargs = {
         "lookback": args.lookback,
         "ewma_span": args.ewma_span,
+        "skip": args.skip,
     }
 
     all_results = {}
 
-    # Equal-weight mode
     if args.mode in ("equal_weight", "both"):
         logger.info("Running equal-weight blend: %s", signal_names)
         eqw_dir = out_dir / "equal_weight" if args.mode == "both" else out_dir
@@ -240,7 +234,6 @@ def main() -> None:
             eqw.metrics["cagr"],
         )
 
-    # Walk-forward mode
     if args.mode in ("walk_forward", "both"):
         logger.info("Running walk-forward optimisation: %s", signal_names)
         wf_dir = out_dir / "walk_forward" if args.mode == "both" else out_dir
@@ -276,7 +269,6 @@ def main() -> None:
             wf.overall_metrics["oos_cagr"],
         )
 
-    # Summary to stdout
     print(json.dumps(all_results, indent=2))
 
 

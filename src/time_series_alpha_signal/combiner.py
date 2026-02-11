@@ -109,6 +109,7 @@ def compute_signals(
     ma_long: int = 50,
     vol_window: int = 20,
     vol_threshold: float = 0.02,
+    skip: int = 21,
 ) -> dict[str, pd.DataFrame]:
     """Compute multiple named signals and return as a dict.
 
@@ -120,7 +121,7 @@ def compute_signals(
         Price data (datetime index, asset columns).
     signal_names : list[str]
         Signal names matching the backtest signal registry.
-    lookback, ewma_span, ma_short, ma_long, vol_window, vol_threshold
+    lookback, ewma_span, ma_short, ma_long, vol_window, vol_threshold, skip
         Signal-specific parameters.
 
     Returns
@@ -143,6 +144,12 @@ def compute_signals(
         ),
         "ma_crossover": lambda p: sig_module.moving_average_crossover_signal(
             p, ma_short=ma_short, ma_long=ma_long
+        ),
+        "skip_month_momentum": lambda p: sig_module.skip_month_momentum_signal(
+            p, lookback=lookback, skip=skip
+        ),
+        "residual_momentum": lambda p: sig_module.residual_momentum_signal(
+            p, lookback=lookback, skip=skip
         ),
     }
 

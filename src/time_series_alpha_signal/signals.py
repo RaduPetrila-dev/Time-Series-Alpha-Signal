@@ -46,6 +46,100 @@ def mean_reversion_signal(prices: pd.DataFrame, lookback: int = 20) -> pd.DataFr
     return rev.shift(1)
 
 
+def skip_month_momentum_signal(
+    prices: pd.DataFrame,
+    lookback: int = 252,
+    skip: int = 21,
+) -> pd.DataFrame:
+    """Cross-sectional momentum skipping the most recent month.
+
+    Computes the return from *lookback* days ago to *skip* days ago,
+    excluding the most recent *skip* days to avoid short-term reversal
+    contamination (Jegadeesh, 1990).
+
+    The classic 12-1 configuration uses lookback=252, skip=21.
+
+    Parameters
+    ----------
+    prices : DataFrame
+        Price data (datetime index, asset columns).
+    lookback : int
+        Total formation period in trading days (default 252).
+    skip : int
+        Recent days to exclude (default 21, ~1 month).
+
+    Returns
+    -------
+    DataFrame
+        Cross-sectional signal scores (lagged by 1 day).
+    """
+    _validate_prices(prices)
+    _validate_lookback(lookback)
+    _validate_lookback(skip, "skip")
+    if skip >= lookback:
+        raise ValueError(f"skip ({skip}) must be < lookback ({lookback}).")
+    formation_ret = prices.shift(skip) / prices.shift(lookback) - 1
+    return formation_ret.shift(1)
+
+
+def residual_momentum_signal(
+    prices: pd.DataFrame,
+    lookback: int = 252,
+    skip: int = 21,
+) -> pd.DataFrame:
+    """Cross-sectional residual momentum (idiosyncratic momentum).
+
+    For each day, regresses each asset's trailing returns against the
+    equal-weight market return to obtain residuals. Then computes
+    momentum on the residual returns, skipping the most recent *skip*
+    days to avoid short-term reversal.
+
+    This captures stock-specific trends independent of broad market
+    direction, reducing drawdowns during market-wide selloffs.
+
+    Parameters
+    ----------
+    prices : DataFrame
+        Price data (datetime index, asset columns).
+    lookback : int
+        Formation period in trading days (default 252).
+    skip : int
+        Recent days to exclude (default 21).
+
+    Returns
+    -------
+    DataFrame
+        Cross-sectional residual momentum scores (lagged by 1 day).
+
+    References
+    ----------
+    Blitz, D., Huij, J. & Martens, M. (2011). Residual Momentum.
+    *Journal of Empirical Finance*, 18(3), 506-521.
+    """
+    _validate_prices(prices)
+    _validate_lookback(lookback)
+    _validate_lookback(skip, "skip")
+    if skip >= lookback:
+        raise ValueError(f"skip ({skip}) must be < lookback ({lookback}).")
+
+    rets = prices.pct_change()
+    market_ret = rets.mean(axis=1)
+
+    residuals = pd.DataFrame(index=rets.index, columns=rets.columns, dtype=float)
+    rolling_var = market_ret.rolling(lookback, min_periods=lookback // 2).var()
+
+    for col in rets.columns:
+        rolling_cov = rets[col].rolling(lookback, min_periods=lookback // 2).cov(market_ret)
+        beta = rolling_cov / rolling_var.clip(lower=1e-10)
+        residuals[col] = rets[col] - beta * market_ret
+
+    residual_cum = residuals.rolling(lookback, min_periods=lookback // 2).sum()
+    residual_cum_skip = residuals.rolling(skip, min_periods=1).sum()
+    signal = residual_cum - residual_cum_skip
+
+    return signal.shift(1)
+
+
 def arima_signal(
     prices: pd.DataFrame,
     order: tuple[int, int, int] = (1, 0, 1),
